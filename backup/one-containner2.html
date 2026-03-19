@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ONE Container - 3 Sizes with Cargo Inside</title>
+    <style>
+        body { margin: 0; background-color: #050505; color: white; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
+        #ui-overlay { position: absolute; top: 20px; left: 20px; pointer-events: none; z-index: 10; }
+        .controls { position: absolute; top: 20px; right: 20px; background: rgba(0,0,0,0.9); padding: 15px; border-radius: 10px; border: 1px solid #ff007f; display: flex; flex-direction: column; gap: 10px; z-index: 10; }
+        button { background: #ff007f; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        button:hover { background: #ff4da6; }
+        h1 { margin: 0; font-size: 1.4rem; color: #ff007f; text-shadow: 0 0 10px rgba(255,0,127,0.5); }
+        .label-container { position: absolute; bottom: 20px; width: 100%; display: flex; justify-content: center; gap: 20px; pointer-events: none; z-index: 10; }
+        .label { background: rgba(255, 0, 127, 0.15); padding: 10px 15px; border-radius: 8px; border: 1px solid #ff007f; font-size: 0.8rem; text-align: center; backdrop-filter: blur(5px); }
+    </style>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div id="ui-overlay">
+        <h1>ONE Container - 20ft / 40ft / 40ft HC</h1>
+    </div>
+
+    <div class="controls">
+        <button id="toggleWalls">🔲 สลับซ่อนผนัง</button>
+        <button id="toggleCargo">📦 สลับซ่อนสินค้า</button>
+        <button id="resetView">🎯 มุมมองเริ่มต้น</button>
+        <div style="display:flex;align-items:center;gap:6px;">
+            <input type="checkbox" id="toggleLabels" />
+            <label for="toggleLabels" style="user-select:none;color:#fff">Show faces / index</label>
+        </div>
+        <div style="margin-top:8px;">
+            <div style="color:#fff;margin-bottom:4px">Lift all containers Y: <span id="containersYVal">0.10</span> m</div>
+            <input id="containersY" type="range" min="-0.5" max="1.5" step="0.01" value="0.10" style="width:220px" />
+        </div>
+        <div style="margin-top:8px;">
+            <div style="color:#fff;margin-bottom:4px">Rotate all containers Y (deg): <span id="containersRotVal">0</span>°</div>
+            <input id="containersRot" type="range" min="-180" max="180" step="1" value="0" style="width:220px" />
+        </div>
+    </div>
+
+    <div class="label-container">
+        <div class="label"><b>20ft</b><br>6.06m | สินค้า 4 พาเลท</div>
+        <div class="label"><b>40ft</b><br>12.19m | สินค้า 8 พาเลท</div>
+        <div class="label"><b>40ft HC</b><br>12.19m x 2.89m | สินค้า 8 พาเลท</div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        class OneContainer {
+            constructor(options = {}) {
+                this.index = options.index || 0;
+                this.width = 2.44; // มาตรฐาน
+                this.height = options.height || 2.59;
+                this.depth = options.length || 6.06;
+                this.isHighCube = options.isHighCube || false;
+                this.color = 0xce117b;
+                this.group = new THREE.Group();
+                
+                this.walls = [];
+                this.cargo = [];
+                this.frameElements = [];
+                
+                this._init();
+            }
+
+            _createDoorTextures() {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                // keep a tall canvas matching the door aspect; increase width for layout room
+                canvas.width = 1400;
+                canvas.height = 2048;
+                
+                // Background color
+                ctx.fillStyle = '#ce117b';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // ขาว
+                ctx.fillStyle = '#ffffff';
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 15;
+                
+                // ONE logo: place more centrally on the left panel area
+                ctx.font = 'bold 380px Arial Black';
+                ctx.fillStyle = '#ffffff';
+                const oneX = Math.round(canvas.width * 0.08);
+                const oneY = 480;
+                ctx.fillText('ONE', oneX, oneY);
+                
+                // OCEAN NETWORK EXPRESS (under ONE)
+                ctx.font = 'bold 64px Arial';
+                ctx.fillText('OCEAN NETWORK EXPRESS', oneX, oneY + 140);
+                
+                // Right-side info block (CSC plate + weights) placed on the right panel
+                const infoX = Math.round(canvas.width * 0.56);
+                let infoY = 760;
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 4;
+                ctx.strokeRect(infoX, infoY - 20, 420, 520);
+
+                ctx.font = 'bold 46px Arial';
+                ctx.fillText('CSC SAFETY', infoX + 24, infoY + 30);
+                ctx.fillText('APPROVAL', infoX + 24, infoY + 86);
+
+                ctx.font = 'bold 48px Arial';
+                ctx.fillText(this.isHighCube ? '45G1' : '42G1', infoX + 24, infoY + 150);
+                ctx.font = 'bold 40px Arial';
+                ctx.fillText('035041 2', infoX + 24, infoY + 200);
+                ctx.fillText('4509', infoX + 24, infoY + 250);
+
+                // weights block
+                ctx.font = 'bold 34px Arial';
+                let wy = infoY + 320;
+                ctx.fillText('MAX.GROSS', infoX + 24, wy);
+                ctx.fillText(this.isHighCube ? '32.500KGS' : '30.480KGS', infoX + 220, wy);
+                wy += 46;
+                ctx.fillText('TARE', infoX + 24, wy);
+                ctx.fillText(this.depth > 10 ? '3.820KG' : '2.230KG', infoX + 220, wy);
+                wy += 46;
+                ctx.fillText('NET', infoX + 24, wy);
+                ctx.fillText(this.isHighCube ? '28.680KGS' : '28.250KGS', infoX + 220, wy);
+
+                // CU.CAP
+                ctx.fillText('CU.CAP', infoX + 24, wy + 56);
+                ctx.fillText(this.depth > 10 ? '67.5CU.M' : '33.2CU.M', infoX + 220, wy + 56);
+                
+                // CAUTION block: move to lower-left area and scale down for readability
+                ctx.fillStyle = '#ffff00';
+                ctx.font = 'bold 110px Arial Black';
+                ctx.fillText('CAUTION', oneX, 1420);
+                ctx.font = 'bold 120px Arial Black';
+                ctx.fillText(this.isHighCube ? '108"' : '96"', oneX, 1560);
+                ctx.font = 'bold 90px Arial Black';
+                ctx.fillText('HIGH CONTAINER', oneX, 1700);
+                
+                const texture = new THREE.CanvasTexture(canvas);
+                return texture;
+            }
+
+            _createSideTexture() {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = 2048;
+                canvas.height = 1024;
+                
+                ctx.fillStyle = '#ce117b';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // ลายลูกฟูก
+                ctx.strokeStyle = '#a00e63';
+                ctx.lineWidth = 20;
+                for(let i = 100; i < canvas.height; i += 100) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, i);
+                    ctx.lineTo(canvas.width, i);
+                    ctx.stroke();
+                }
+                
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 400px Arial Black';
+                ctx.fillText('ONE', 200, 550);
+                
+                ctx.font = 'bold 70px Arial';
+                ctx.fillText('OCEAN NETWORK EXPRESS', 200, 700);
+                
+                ctx.font = 'bold 60px Arial';
+                ctx.fillText('ONEU 035041 2', 1400, 300);
+                ctx.fillText(this.isHighCube ? '45G1' : '42G1', 1400, 400);
+                
+                ctx.font = 'bold 35px Arial';
+                ctx.fillText(`MAX.GROSS ${this.isHighCube ? '32.500KGS' : '30.480KGS'} ${this.isHighCube ? '71.650LBS' : '67.200LBS'}`, 200, 850);
+                ctx.fillText(`TARE ${this.depth > 10 ? '3.820KG' : '2.230KG'} ${this.depth > 10 ? '8.420LB' : '4.920LB'}`, 200, 900);
+                ctx.fillText(`NET ${this.isHighCube ? '28.680KGS' : '28.250KGS'} ${this.isHighCube ? '63.230LBS' : '62.280LBS'}`, 200, 950);
+                
+                ctx.fillStyle = '#ffff00';
+                ctx.font = 'bold 40px Arial';
+                ctx.fillText('COR-TEN STEEL', 1400, 600);
+                ctx.fillText('CONTAINER', 1400, 660);
+                
+                const texture = new THREE.CanvasTexture(canvas);
+                return texture;
+            }
+
+            _createFrontTexture() {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = 1024;
+                canvas.height = 1024;
+                
+                ctx.fillStyle = '#ce117b';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 150px Arial Black';
+                ctx.fillText('ONE', 100, 400);
+                
+                ctx.font = 'bold 40px Arial';
+                ctx.fillText('OCEAN NETWORK EXPRESS', 100, 500);
+                
+                ctx.fillStyle = '#ffff00';
+                ctx.font = 'bold 60px Arial Black';
+                ctx.fillText('CAUTION', 100, 700);
+                ctx.fillText(this.isHighCube ? '108" HIGH' : '96" HIGH', 100, 800);
+                ctx.fillText('CONTAINER', 100, 900);
+                
+                const texture = new THREE.CanvasTexture(canvas);
+                return texture;
+            }
+
+            _buildFrame() {
+                const frameMat = new THREE.MeshStandardMaterial({ color: 0x666666, metalness: 0.9, roughness: 0.2 });
+                const thickness = 0.12;
+                const cornerSize = 0.18;
+                
+                const hw = this.width/2; 
+                const hh = this.height/2; 
+                const hd = this.depth/2;
+                
+                // เสามุม
+                const cornerPositions = [
+                    [hw, hh - cornerSize/2, hd], [-hw, hh - cornerSize/2, hd], 
+                    [hw, hh - cornerSize/2, -hd], [-hw, hh - cornerSize/2, -hd],
+                    [hw, -hh + cornerSize/2, hd], [-hw, -hh + cornerSize/2, hd],
+                    [hw, -hh + cornerSize/2, -hd], [-hw, -hh + cornerSize/2, -hd]
+                ];
+                
+                cornerPositions.forEach(pos => {
+                    const corner = new THREE.Mesh(
+                        new THREE.BoxGeometry(cornerSize, cornerSize, cornerSize),
+                        new THREE.MeshStandardMaterial({ color: 0x444444, metalness: 0.9 })
+                    );
+                    corner.position.set(pos[0], pos[1], pos[2]);
+                    this.group.add(corner);
+                    this.frameElements.push(corner);
+                });
+
+                // คานแนวตั้ง
+                const verticalPositions = [
+                    [hw, 0, hd], [-hw, 0, hd], [hw, 0, -hd], [-hw, 0, -hd]
+                ];
+                
+                verticalPositions.forEach(pos => {
+                    const vertical = new THREE.Mesh(
+                        new THREE.BoxGeometry(thickness, this.height - cornerSize*2, thickness),
+                        frameMat
+                    );
+                    vertical.position.set(pos[0], pos[1], pos[2]);
+                    this.group.add(vertical);
+                    this.frameElements.push(vertical);
+                });
+
+                // คานตามยาว
+                const railLength = this.depth - cornerSize*2;
+                const railPositions = [
+                    [hw - cornerSize/2 + 0.02, hh - cornerSize/2, 0, railLength],
+                    [-hw + cornerSize/2 - 0.02, hh - cornerSize/2, 0, railLength],
+                    [hw - cornerSize/2 + 0.02, -hh + cornerSize/2, 0, railLength],
+                    [-hw + cornerSize/2 - 0.02, -hh + cornerSize/2, 0, railLength]
+                ];
+                
+                railPositions.forEach(pos => {
+                    const rail = new THREE.Mesh(
+                        new THREE.BoxGeometry(thickness, thickness, pos[3]),
+                        frameMat
+                    );
+                    rail.position.set(pos[0], pos[1], pos[2]);
+                    this.group.add(rail);
+                    this.frameElements.push(rail);
+                });
+
+                // คานหัวท้าย
+                const endLength = this.width - cornerSize*2;
+                const endPositions = [
+                    [0, hh - cornerSize/2, hd - cornerSize/2 + 0.02, endLength],
+                    [0, hh - cornerSize/2, -hd + cornerSize/2 - 0.02, endLength],
+                    [0, -hh + cornerSize/2, hd - cornerSize/2 + 0.02, endLength],
+                    [0, -hh + cornerSize/2, -hd + cornerSize/2 - 0.02, endLength]
+                ];
+                
+                endPositions.forEach(pos => {
+                    const endRail = new THREE.Mesh(
+                        new THREE.BoxGeometry(pos[3], thickness, thickness),
+                        frameMat
+                    );
+                    endRail.position.set(pos[0], pos[1], pos[2]);
+                    this.group.add(endRail);
+                    this.frameElements.push(endRail);
+                });
+            }
+
+            _addCargo() {
+                const floorY = -this.height/2 + 0.2;
+                const colors = [0x8b4513, 0xa0522d, 0xcd853f, 0xd2691e, 0x8b5a2b, 0x9c7c3b];
+                
+                // จำนวนพาเลทตามขนาดตู้
+                const palletCount = this.depth > 10 ? 8 : 4;
+                const startZ = -this.depth/2 + 1.2;
+                
+                for(let i = 0; i < palletCount; i++) {
+                    const zPos = startZ + (i * 1.5);
+                    if(zPos > this.depth/2 - 1.0) continue;
+                    
+                    // พาเลทซ้าย - กล่อง
+                    const palletMat = new THREE.MeshStandardMaterial({ color: 0xdeb887 });
+                    const palletBase = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.08, 1.0), palletMat);
+                    palletBase.position.set(-0.6, floorY + 0.04, zPos);
+                    this.group.add(palletBase);
+                    
+                    // กล่องซ้อน 3 ชั้น
+                    for(let j = 0; j < 3; j++) {
+                        const crateGeo = new THREE.BoxGeometry(0.9, 0.3, 0.9);
+                        const crateMat = new THREE.MeshStandardMaterial({ color: colors[(i + j) % colors.length] });
+                        const crate = new THREE.Mesh(crateGeo, crateMat);
+                        crate.position.set(-0.6, floorY + 0.2 + (j * 0.32), zPos);
+                        this.group.add(crate);
+                        this.cargo.push(crate);
+                    }
+                    
+                    // พาเลทขวา - ถัง
+                    const palletBase2 = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.08, 1.0), palletMat);
+                    palletBase2.position.set(0.6, floorY + 0.04, zPos + 0.2);
+                    this.group.add(palletBase2);
+                    
+                    // ถัง 2 ใบ
+                    const drumMat = new THREE.MeshStandardMaterial({ color: 0xcc3333 });
+                    const drumGeo = new THREE.CylinderGeometry(0.4, 0.4, 0.9, 10);
+                    const drum1 = new THREE.Mesh(drumGeo, drumMat);
+                    drum1.position.set(0.6, floorY + 0.5, zPos + 0.2);
+                    this.group.add(drum1);
+                    this.cargo.push(drum1);
+                    
+                    const drumMat2 = new THREE.MeshStandardMaterial({ color: 0x33cc33 });
+                    const drum2 = new THREE.Mesh(drumGeo, drumMat2);
+                    drum2.position.set(0.6, floorY + 0.5, zPos - 0.3);
+                    this.group.add(drum2);
+                    this.cargo.push(drum2);
+                    
+                    // แถบรัด
+                    const strapMat = new THREE.MeshStandardMaterial({ color: 0x000000 });
+                    const strap = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.02, 1.0), strapMat);
+                    strap.position.set(-0.6, floorY + 0.5, zPos);
+                    this.group.add(strap);
+                    this.cargo.push(strap);
+                }
+            }
+
+            _init() {
+                this._buildFrame();
+                
+                // คานขวางพื้น
+                const beamMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.8 });
+                for(let z = -this.depth/2 + 0.3; z < this.depth/2 - 0.25; z += 0.3) {
+                    const beam = new THREE.Mesh(
+                        new THREE.BoxGeometry(this.width - 0.2, 0.12, 0.08),
+                        beamMat
+                    );
+                    beam.position.set(0, -this.height/2 + 0.14, z);
+                    this.group.add(beam);
+                    this.frameElements.push(beam);
+                }
+                
+                // พื้นไม้
+                const floorMat = new THREE.MeshStandardMaterial({ color: 0x8b5a2b, roughness: 0.9 });
+                const floor = new THREE.Mesh(
+                    new THREE.BoxGeometry(this.width - 0.1, 0.05, this.depth - 0.2),
+                    floorMat
+                );
+                floor.position.set(0, -this.height/2 + 0.185, 0);
+                this.group.add(floor);
+                
+                // Corner castings
+                const castingMat = new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.9 });
+                const hw = this.width/2; const hh = this.height/2; const hd = this.depth/2;
+                const positions = [
+                    [hw, hh, hd], [-hw, hh, hd], [hw, -hh, hd], [-hw, -hh, hd],
+                    [hw, hh, -hd], [-hw, hh, -hd], [hw, -hh, -hd], [-hw, -hh, -hd]
+                ];
+                
+                positions.forEach(pos => {
+                    const casting = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.18, 0.18), castingMat);
+                    casting.position.set(...pos);
+                    this.group.add(casting);
+                });
+
+                // ผนัง
+                const wallMaterial = {
+                    RIGHT: new THREE.MeshStandardMaterial({ map: this._createSideTexture(), side: THREE.DoubleSide }),
+                    LEFT: new THREE.MeshStandardMaterial({ map: this._createSideTexture(), side: THREE.DoubleSide }),
+                    FRONT: new THREE.MeshStandardMaterial({ map: this._createFrontTexture(), side: THREE.DoubleSide }),
+                    BACK: new THREE.MeshStandardMaterial({ map: this._createDoorTextures(), side: THREE.DoubleSide })
+                };
+
+                const sideGeo = new THREE.PlaneGeometry(this.depth - 0.1, this.height - 0.1);
+                const rightWall = new THREE.Mesh(sideGeo, wallMaterial.RIGHT);
+                rightWall.position.set(this.width/2 - 0.02, 0, 0);
+                rightWall.rotation.y = Math.PI/2;
+                this.group.add(rightWall);
+                this.walls.push(rightWall);
+
+                const leftWall = new THREE.Mesh(sideGeo, wallMaterial.LEFT);
+                leftWall.position.set(-this.width/2 + 0.02, 0, 0);
+                leftWall.rotation.y = -Math.PI/2;
+                this.group.add(leftWall);
+                this.walls.push(leftWall);
+
+                const frontGeo = new THREE.PlaneGeometry(this.width - 0.1, this.height - 0.1);
+                const frontWall = new THREE.Mesh(frontGeo, wallMaterial.FRONT);
+                frontWall.position.set(0, 0, -this.depth/2 + 0.02);
+                frontWall.rotation.y = 0;
+                this.group.add(frontWall);
+                // If front decor appears mirrored, flip its texture horizontally
+                try {
+                    if (frontWall.material && frontWall.material.map) {
+                        const m = frontWall.material.map;
+                        m.center = m.center || new THREE.Vector2(0.5, 0.5);
+                        m.repeat = m.repeat || new THREE.Vector2(1, 1);
+                        m.repeat.x = -1;
+                        m.wrapS = THREE.RepeatWrapping;
+                        m.needsUpdate = true;
+                    }
+                } catch (e) { console.warn('flip front wall failed', e); }
+                this.walls.push(frontWall);
+
+                const backWall = new THREE.Mesh(frontGeo, wallMaterial.BACK);
+                backWall.position.set(0, 0, this.depth/2 - 0.02);
+                backWall.rotation.y = Math.PI;
+                this.group.add(backWall);
+                // Mirror only the BACK wall texture horizontally so decor reads correctly.
+                // Use RepeatWrapping when repeat.x is negative so the flipped texture is sampled correctly.
+                try {
+                    if (backWall.material && backWall.material.map) {
+                        const m = backWall.material.map;
+                        m.center = m.center || new THREE.Vector2(0.5, 0.5);
+                        m.repeat = m.repeat || new THREE.Vector2(1, 1);
+                        m.repeat.x = -1;
+                        m.wrapS = THREE.RepeatWrapping;
+                        m.needsUpdate = true;
+                    }
+                } catch (e) { console.warn('flip back wall failed', e); }
+                this.walls.push(backWall);
+
+                // สร้างป้ายบอกด้านและป้าย index (แต่ซ่อนเริ่มต้นไว้)
+                this.faceLabels = [];
+                this.indexSprite = null;
+                try {
+                    const makeSprite = (text, opts = {}) => {
+                        const size = opts.size || 256;
+                        const canvas = document.createElement('canvas'); canvas.width = size; canvas.height = Math.round(size * 0.45);
+                        const ctx = canvas.getContext('2d');
+                        ctx.fillStyle = opts.bg || 'rgba(0,0,0,0.6)'; ctx.fillRect(0,0,canvas.width,canvas.height);
+                        ctx.fillStyle = opts.color || '#ffffff'; ctx.font = (opts.fontSize || Math.round(canvas.height * 0.5)) + 'px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+                        ctx.fillText(text, canvas.width/2, canvas.height/2);
+                        const tex = new THREE.CanvasTexture(canvas); tex.encoding = THREE.sRGBEncoding; tex.needsUpdate = true;
+                        const mat = new THREE.SpriteMaterial({ map: tex, depthTest: false, depthWrite: false });
+                        const s = new THREE.Sprite(mat);
+                        s.scale.set(opts.scaleX || 0.9, opts.scaleY || 0.4, 1);
+                        s.visible = false;
+                        return s;
+                    };
+
+                    // attach center labels to each wall (positioned slightly in front)
+                    const rLabel = makeSprite('RIGHT', { scaleX: 1.0, scaleY: 0.45 });
+                    rightWall.add(rLabel); rLabel.position.set(0, 0, 0.02); this.faceLabels.push(rLabel);
+
+                    const lLabel = makeSprite('LEFT', { scaleX: 1.0, scaleY: 0.45 });
+                    leftWall.add(lLabel); lLabel.position.set(0, 0, 0.02); this.faceLabels.push(lLabel);
+
+                    const fLabel = makeSprite('FRONT', { scaleX: 1.2, scaleY: 0.45 });
+                    frontWall.add(fLabel); fLabel.position.set(0, 0, 0.02); this.faceLabels.push(fLabel);
+
+                    const bLabel = makeSprite('BACK', { scaleX: 1.2, scaleY: 0.45 });
+                    backWall.add(bLabel); bLabel.position.set(0, 0, 0.02); this.faceLabels.push(bLabel);
+
+                    // container index sprite above roof center
+                    const idx = makeSprite(String(this.index), { scaleX: 0.5, scaleY: 0.5, fontSize: Math.round(80) });
+                    idx.position.set(0, this.height/2 + 0.25, 0);
+                    this.group.add(idx); this.indexSprite = idx;
+                } catch (e) { /* ignore sprite failures */ }
+
+                // หลังคา
+                const roofGeo = new THREE.PlaneGeometry(this.width - 0.1, this.depth - 0.1);
+                const roofMat = new THREE.MeshStandardMaterial({ color: 0xce117b, side: THREE.DoubleSide });
+                const roof = new THREE.Mesh(roofGeo, roofMat);
+                roof.position.set(0, this.height/2 - 0.02, 0);
+                roof.rotation.x = Math.PI/2;
+                this.group.add(roof);
+                this.walls.push(roof);
+
+                // เพิ่มสินค้า
+                this._addCargo();
+
+                // Compute a sensible base Y for the group (close to floor alignment)
+                this.group.position.y = this.height / 2 - 0.21;
+                // Ensure no frame element (corner posts, etc.) sits below world y=0.
+                // If any mesh bottom is below 0, raise the whole group accordingly.
+                try {
+                    let minBottom = Infinity;
+                    this.frameElements.forEach(el => {
+                        if (!el || !el.geometry) return;
+                        el.geometry.computeBoundingBox();
+                        const bbMinY = el.geometry.boundingBox.min.y;
+                        const worldBottom = this.group.position.y + el.position.y + bbMinY;
+                        if (worldBottom < minBottom) minBottom = worldBottom;
+                    });
+                    if (isFinite(minBottom) && minBottom < 0) {
+                        this.group.position.y += (-minBottom) + 0.001;
+                    }
+                } catch (e) { console.warn('adjust group Y failed', e); }
+            }
+
+            setWallsVisible(visible) {
+                this.walls.forEach(el => el.visible = visible);
+            }
+
+            setCargoVisible(visible) {
+                this.cargo.forEach(el => el.visible = visible);
+            }
+
+            getGroup() { return this.group; }
+        }
+
+        class ContainerApp {
+            constructor() {
+                this.scene = new THREE.Scene();
+                this.containers = [];
+                this.wallsVisible = true;
+                this.cargoVisible = true;
+                
+                this._init();
+                this._addObjects();
+                this._animate();
+                this._setupEvents();
+            }
+
+            _init() {
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.setPixelRatio(window.devicePixelRatio);
+                this.renderer.shadowMap.enabled = true;
+                document.body.appendChild(this.renderer.domElement);
+
+                this.camera = new THREE.PerspectiveCamera(35, window.innerWidth / window.innerHeight, 0.1, 1000);
+                this.camera.position.set(12, 6, 25);
+
+                this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+                this.controls.enableDamping = true;
+                this.controls.target.set(0, 1.5, 0);
+                
+                this.scene.background = new THREE.Color(0x111122);
+                
+                // แสง
+                const ambientLight = new THREE.AmbientLight(0x404060);
+                this.scene.add(ambientLight);
+                
+                const sunLight = new THREE.DirectionalLight(0xfff5e6, 1.5);
+                sunLight.position.set(5, 10, 7);
+                sunLight.castShadow = true;
+                this.scene.add(sunLight);
+                
+                const fillLight = new THREE.PointLight(0x4466ff, 0.3);
+                fillLight.position.set(-3, 3, 5);
+                this.scene.add(fillLight);
+            }
+
+            _addObjects() {
+                // 20ft container
+                const c1 = new OneContainer({ 
+                    index: 1, 
+                    length: 6.06,
+                    height: 2.59,
+                    isHighCube: false
+                });
+                // keep the Y computed in the container (so internal floor stays at world y=0)
+                c1.getGroup().position.set(-7, c1.getGroup().position.y, -2);
+                c1.getGroup().rotation.y = 0.1;
+                this.scene.add(c1.getGroup());
+                this.containers.push(c1);
+
+                // 40ft container
+                const c2 = new OneContainer({ 
+                    index: 2, 
+                    length: 12.19,
+                    height: 2.59,
+                    isHighCube: false
+                });
+                c2.getGroup().position.set(0, c2.getGroup().position.y, 0);
+                c2.getGroup().rotation.y = 0;
+                this.scene.add(c2.getGroup());
+                this.containers.push(c2);
+
+                // 40ft HC container
+                const c3 = new OneContainer({ 
+                    index: 3, 
+                    length: 12.19,
+                    height: 2.89,
+                    isHighCube: true
+                });
+                c3.getGroup().position.set(7, c3.getGroup().position.y, 2);
+                c3.getGroup().rotation.y = -0.1;
+                this.scene.add(c3.getGroup());
+                this.containers.push(c3);
+
+                // store base Y and rotation for each container so the UI sliders apply relative deltas
+                this.containers.forEach(c => {
+                    try { c.baseY = c.getGroup().position.y; c.baseRot = c.getGroup().rotation.y; } catch (e) {}
+                });
+
+                // apply initial containers Y slider value (default 0.10 m)
+                try {
+                    const initEl = document.getElementById('containersY');
+                    const initVal = initEl ? parseFloat(initEl.value) : 0.0;
+                    if (!isNaN(initVal) && initVal !== 0) {
+                        this.containers.forEach(c => {
+                            try { c.getGroup().position.y = (typeof c.baseY === 'number' ? c.baseY : c.getGroup().position.y) + initVal; } catch (e) {}
+                        });
+                    }
+                } catch (e) { }
+
+                // Grid
+                const gridHelper = new THREE.GridHelper(30, 30, 0xff007f, 0x333333);
+                gridHelper.position.y = -0.01;
+                this.scene.add(gridHelper);
+            }
+
+            _setupEvents() {
+                document.getElementById('toggleWalls').addEventListener('click', () => {
+                    this.wallsVisible = !this.wallsVisible;
+                    this.containers.forEach(c => c.setWallsVisible(this.wallsVisible));
+                });
+
+                document.getElementById('toggleCargo').addEventListener('click', () => {
+                    this.cargoVisible = !this.cargoVisible;
+                    this.containers.forEach(c => c.setCargoVisible(this.cargoVisible));
+                });
+
+                // toggle face/index labels for all containers
+                const lblChk = document.getElementById('toggleLabels');
+                if (lblChk) {
+                    lblChk.addEventListener('change', () => {
+                        const show = lblChk.checked;
+                        this.containers.forEach(c => {
+                            try {
+                                if (c.faceLabels && Array.isArray(c.faceLabels)) c.faceLabels.forEach(s => s.visible = show);
+                                if (c.indexSprite) c.indexSprite.visible = show;
+                            } catch (e) {}
+                        });
+                    });
+                }
+
+                // containers Y offset slider
+                const cy = document.getElementById('containersY');
+                const cyVal = document.getElementById('containersYVal');
+                if (cy && cyVal) {
+                    cy.addEventListener('input', () => {
+                        const v = parseFloat(cy.value);
+                        cyVal.textContent = v.toFixed(2);
+                        this.containers.forEach(c => {
+                            try { c.getGroup().position.y = (typeof c.baseY === 'number' ? c.baseY : c.getGroup().position.y) + v; } catch (e) {}
+                        });
+                    });
+                }
+
+                // containers rotation Y slider (degrees)
+                const cr = document.getElementById('containersRot');
+                const crVal = document.getElementById('containersRotVal');
+                if (cr && crVal) {
+                    cr.addEventListener('input', () => {
+                        const deg = parseFloat(cr.value);
+                        crVal.textContent = deg.toFixed(0);
+                        const rad = deg * Math.PI / 180;
+                        this.containers.forEach(c => {
+                            try { c.getGroup().rotation.y = (typeof c.baseRot === 'number' ? c.baseRot : 0) + rad; } catch (e) {}
+                        });
+                    });
+                }
+
+                document.getElementById('resetView').addEventListener('click', () => {
+                    this.camera.position.set(12, 6, 25);
+                    this.controls.target.set(0, 1.5, 0);
+                });
+
+                window.addEventListener('resize', () => {
+                    this.camera.aspect = window.innerWidth / window.innerHeight;
+                    this.camera.updateProjectionMatrix();
+                    this.renderer.setSize(window.innerWidth, window.innerHeight);
+                });
+            }
+
+            _animate() {
+                requestAnimationFrame(() => this._animate());
+                this.controls.update();
+                this.renderer.render(this.scene, this.camera);
+            }
+        }
+
+        window.onload = () => new ContainerApp();
+    </script>
+</body>
+</html>

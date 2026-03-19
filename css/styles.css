@@ -1,0 +1,292 @@
+/* POLIMAXX Application Styles */
+
+body {
+    margin: 0;
+    overflow: hidden;
+    background: #2a2a3a;
+    font-family: 'Arial', sans-serif;
+}
+
+.badge {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: #f37021;
+    color: #000;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-weight: bold;
+    z-index: 200;
+    box-shadow: 0 2px 15px #f37021;
+}
+
+.ui-panel {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    color: white;
+    background: rgba(30, 30, 40, 0.9);
+    padding: 15px 25px;
+    border-radius: 12px;
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    border-left: 4px solid #f37021;
+    z-index: 100;
+    pointer-events: auto;
+    width: 320px;
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.7);
+    
+    /* Custom scrollbar styling */
+    scrollbar-width: thin;
+    scrollbar-color: #f37021 rgba(255,255,255,0.1);
+}
+
+/* WebKit scrollbar styling */
+.ui-panel::-webkit-scrollbar {
+    width: 8px;
+}
+
+.ui-panel::-webkit-scrollbar-track {
+    background: rgba(255,255,255,0.1);
+    border-radius: 4px;
+}
+
+.ui-panel::-webkit-scrollbar-thumb {
+    background: #f37021;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+.ui-panel::-webkit-scrollbar-thumb:hover {
+    background: #ff8c42;
+}
+
+h1 {
+    margin: 0;
+    font-size: 16px;
+    color: #f37021;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+p {
+    margin: 5px 0 0;
+    font-size: 12px;
+    opacity: 0.9;
+}
+
+.control-group {
+    background: #2a2a3a;
+    border-radius: 8px;
+    padding: 12px;
+    margin: 15px 0;
+    border: 1px solid #4a4a5a;
+}
+
+.section-label {
+    color: #f37021;
+    font-weight: bold;
+}
+
+.bag-selector {
+    display: flex;
+    gap: 8px;
+    margin: 10px 0;
+    flex-wrap: wrap;
+}
+
+.bag-btn {
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    border: 2px solid #666;
+    background: #3a3a4a;
+    color: white;
+    font-weight: bold;
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.bag-btn.active {
+    border-color: #f37021;
+    background: #f37021;
+    color: black;
+    transform: scale(1.1);
+    box-shadow: 0 0 20px #f37021;
+}
+
+.value-display {
+    background: #1a1a2a;
+    padding: 10px;
+    border-radius: 6px;
+    font-family: monospace;
+    font-size: 16px;
+    text-align: center;
+    margin: 10px 0;
+    border: 1px solid #f37021;
+    color: #f37021;
+}
+
+.slider-group {
+    margin: 15px 0;
+}
+
+.slider-group label {
+    display: flex;
+    justify-content: space-between;
+    color: #ddd;
+}
+
+input[type=range] {
+    width: 100%;
+    background: #4a4a5a;
+    height: 5px;
+    border-radius: 5px;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #f37021;
+    cursor: pointer;
+}
+
+.rotate-btns {
+    display: flex;
+    gap: 10px;
+    margin: 10px 0;
+}
+
+.rotate-btn {
+    flex: 1;
+    background: #3a3a4a;
+    border: 1px solid #666;
+    color: white;
+    padding: 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.rotate-btn:hover {
+    background: #f37021;
+    color: black;
+}
+
+.action-btns {
+    display: flex;
+    gap: 10px;
+    margin: 15px 0;
+}
+
+.final-actions {
+    display: flex;
+    gap: 10px;
+    margin: 10px 0;
+}
+
+.primary-btn {
+    flex: 1;
+    background: #f37021;
+    border: none;
+    color: black;
+    padding: 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.2s;
+}
+
+.primary-btn:hover {
+    background: #ff8c42;
+    transform: scale(1.02);
+}
+
+.secondary-btn {
+    flex: 1;
+    background: #4a6a9a;
+    border: none;
+    color: white;
+    padding: 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.lock-btn {
+    background: #4a4a5a;
+    border: 2px solid #f37021;
+    color: white;
+    padding: 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    width: 100%;
+    margin: 10px 0;
+    font-size: 14px;
+    transition: all 0.2s;
+}
+
+.lock-btn:hover {
+    background: #f37021;
+    color: black;
+}
+
+.lock-btn.locked {
+    background: #f37021;
+    color: black;
+    border-color: white;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    margin: 10px 0;
+    color: #ddd;
+}
+
+hr {
+    border: 0;
+    border-top: 1px solid #4a4a5a;
+    margin: 15px 0;
+}
+
+.default-values {
+    background: #1a1a2a;
+    padding: 10px;
+    border-radius: 6px;
+    font-family: monospace;
+    font-size: 12px;
+    color: #aaa;
+    margin-top: 10px;
+    border: 1px dashed #666;
+}
+
+/* Custom scrollbar styling */
+.ui-panel::-webkit-scrollbar {
+    width: 8px;
+}
+
+.ui-panel::-webkit-scrollbar-track {
+    background: rgba(74, 74, 90, 0.3);
+    border-radius: 4px;
+}
+
+.ui-panel::-webkit-scrollbar-thumb {
+    background: #f37021;
+    border-radius: 4px;
+}
+
+.ui-panel::-webkit-scrollbar-thumb:hover {
+    background: #ff8c42;
+}

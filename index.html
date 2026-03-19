@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>POLIMAXX IRPC Production</title>
+<link rel="stylesheet" href="./css/polimaxx_styles.css">
+<link rel="shortcut icon" href="#"><!-- fix favicon.ico -->
+<script type="importmap">
+{
+	"imports": {
+		"three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+		"three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+		"lil-gui": "https://unpkg.com/lil-gui@0.17.0/dist/lil-gui.esm.min.js"
+	}
+}
+</script>
+</head>
+<body>
+<div class="controls">
+	<button id="btn-reset" class="active">รีเซ็ตตำแหน่ง</button>
+	<button id="btn-align">จ้องมองถุง</button>
+	<button id="btn-wall-toggle">ซ่อน/แสดงผนัง</button>
+</div>
+<script type="module" src="./js/polimaxx_app.js"></script>
+</body>
+</html>

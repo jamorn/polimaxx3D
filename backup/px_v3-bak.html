@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PX v3 — Pallet + Single Bag Demo</title>
+    <style>
+        body { margin:0; background:#111216; color:#ddd; font-family:Arial, sans-serif; }
+        .ui { position: absolute; left:12px; top:12px; z-index:10; background:rgba(0,0,0,0.6); padding:10px 12px; border-radius:8px; border-left:4px solid #f37021; }
+    </style>
+    <script type="importmap">
+        { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }
+    </script>
+</head>
+<body>
+    <div class="ui"><strong>PX v3</strong><div>Single pallet + one bag demo — controls: move, rotate, zoom, walk-in, face labels.</div></div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // ------ TextureFactory (minimal copy from polimaxxV2) ------
+        class TextureFactory {
+            static createTopTexture(rotation = 0) {
+                const canvas = document.createElement('canvas');
+                canvas.width = 2048;
+                canvas.height = 2048;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                const centerX = canvas.width / 2;
+                const centerY = canvas.height / 2;
+                
+                if (rotation !== 0) {
+                    ctx.translate(centerX, centerY);
+                    ctx.rotate(rotation);
+                    ctx.translate(-centerX, -centerY);
+                }
+                
+                ctx.textAlign = 'center';
+                
+                // POLIMAXX สีน้ำเงิน
+                ctx.fillStyle = '#0e3a66';
+                ctx.font = 'bold 220px sans-serif';
+                ctx.fillText('POLIMAXX', centerX, 400);
+                
+                // วงกลมสีส้ม
+                ctx.strokeStyle = '#f37021';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.arc(centerX - 416, 336, 30, 0, Math.PI * 2);
+                ctx.stroke();
+
+                // PP ใหญ่สีส้ม
+                ctx.fillStyle = '#f37021';
+                ctx.font = 'bold 360px sans-serif';
+                ctx.fillText('PP', centerX, 840);
+
+                // POLYETHYLENE
+                ctx.fillStyle = '#0e3a66';
+                ctx.font = 'bold 150px sans-serif';
+                ctx.fillText('POLYETHYLENE', centerX, 1040);
+
+                // วงกลมขวา
+                ctx.strokeStyle = '#f37021';
+                ctx.lineWidth = 30;
+                ctx.beginPath();
+                ctx.arc(1760, 400, 120, 0, Math.PI * 2);
+                ctx.stroke();
+                
+                ctx.lineWidth = 20;
+                ctx.beginPath();
+                ctx.arc(1840, 640, 60, 0, Math.PI * 2);
+                ctx.stroke();
+
+                // วงกลมแดง 4 วง
+                for(let i = 0; i < 4; i++) {
+                    const x = 400 + (i * 170);
+                    const y = 1360;
+                    
+                    ctx.fillStyle = '#ff0000';
+                    ctx.beginPath();
+                    ctx.arc(x, y, 64, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    ctx.strokeStyle = '#333';
+                    ctx.lineWidth = 6;
+                    ctx.beginPath();
+                    ctx.arc(x, y, 64, 0, Math.PI * 2);
+                    ctx.stroke();
+                    
+                    ctx.fillStyle = '#ff6666';
+                    ctx.beginPath();
+                    ctx.arc(x - 10, y - 10, 16, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // NET WEIGHT
+                ctx.textAlign = 'left';
+                ctx.fillStyle = '#111';
+                ctx.font = 'bold 120px sans-serif';
+                ctx.fillText('NET WEIGHT 25 KG', 360, 1760);
+                
+                if (rotation !== 0) {
+                    ctx.setTransform(1, 0, 0, 1, 0, 0);
+                }
+
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.needsUpdate = true;
+                tex.encoding = THREE.sRGBEncoding;
+                return tex;
+            }
+
+            static createSideTexture(physLength = 0.5667, physHeight = 0.28) {
+                // Create a canvas sized to the physical aspect ratio of the bag face so
+                // pixels-per-meter are equal in U and V — this prevents apparent stretching
+                const targetHeight = 512; // base pixel height
+                const ratio = physLength / physHeight;
+                const canvas = document.createElement('canvas');
+                canvas.width = Math.max(512, Math.round(targetHeight * ratio));
+                canvas.height = targetHeight;
+                const ctx = canvas.getContext('2d');
+                // white background
+                ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // scale factor relative to the previous 2048x512 reference layout
+                const scale = canvas.width / 2048;
+                const centerY = canvas.height / 2;
+
+                // Left: batch / lot (large) — increase size and tighten gaps to match init_v1
+                ctx.fillStyle = '#000000'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+                ctx.font = Math.round(140 * scale) + 'px sans-serif';
+                const leftX = Math.round(28 * scale);
+                const batchText = '1126NK 0260204008';
+                ctx.fillText(batchText, leftX, centerY);
+
+                // Diamond/standard mark (icon) to the right of batch (closer gap)
+                const iconX = leftX + ctx.measureText(batchText).width + Math.round(24 * scale);
+                const iconY = centerY;
+                const iconHalf = Math.round(64 * scale);
+                ctx.lineWidth = Math.max(2, Math.round(8 * scale)); ctx.strokeStyle = '#000'; ctx.beginPath();
+                ctx.moveTo(iconX, iconY - iconHalf); ctx.lineTo(iconX + iconHalf, iconY);
+                ctx.lineTo(iconX, iconY + iconHalf); ctx.lineTo(iconX - iconHalf, iconY); ctx.closePath(); ctx.stroke();
+                // cross inside
+                ctx.beginPath(); ctx.moveTo(iconX, iconY - iconHalf); ctx.lineTo(iconX, iconY + iconHalf); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(iconX - Math.round(32 * scale), iconY); ctx.lineTo(iconX + Math.round(32 * scale), iconY); ctx.stroke();
+
+                // TIS / PP lines — place just to right of icon, two lines stacked
+                const specsX = iconX + Math.round(42 * scale);
+                ctx.fillStyle = '#000'; ctx.font = Math.round(40 * scale) + 'px sans-serif'; ctx.textAlign = 'left';
+                ctx.fillText('TIS.1306-2566', specsX, centerY - Math.round(18 * scale));
+                ctx.fillText('PP-01-1-5-F', specsX, centerY + Math.round(28 * scale));
+
+                // QR / blocks after specs — larger and placed closer to PP block
+                const qrX = specsX + Math.round(140 * scale);
+                const qrY = centerY - Math.round(56 * scale);
+                const qrSize = Math.round(120 * scale);
+                ctx.fillStyle = '#000'; ctx.fillRect(qrX, qrY, qrSize, qrSize);
+                ctx.fillStyle = '#fff'; ctx.fillRect(qrX + Math.round(18 * scale), qrY + Math.round(18 * scale), Math.round(24 * scale), Math.round(24 * scale)); ctx.fillRect(qrX + Math.round(66 * scale), qrY + Math.round(66 * scale), Math.round(24 * scale), Math.round(24 * scale));
+
+                // PP HOMO and line code to the right of QR (larger and spaced)
+                const ppX = qrX + Math.round(140 * scale);
+                ctx.fillStyle = '#000'; ctx.font = Math.round(72 * scale) + 'px sans-serif'; ctx.fillText('PP HOMO', ppX, centerY - Math.round(8 * scale));
+                ctx.font = Math.round(48 * scale) + 'px sans-serif'; ctx.fillText('B  06:28', ppX, centerY + Math.round(44 * scale));
+
+                // (RoHS) near right edge (with margin)
+                ctx.font = 'italic ' + Math.round(52 * scale) + 'px sans-serif'; ctx.fillText('(RoHS)', canvas.width - Math.round(120 * scale), centerY);
+
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.needsUpdate = true; tex.encoding = THREE.sRGBEncoding; tex.wrapS = THREE.ClampToEdgeWrapping; tex.wrapT = THREE.ClampToEdgeWrapping;
+                return tex;
+            }
+
+            static createBlankTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 512;
+                canvas.height = 512;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                return new THREE.CanvasTexture(canvas);
+            }
+        }
+
+        // ------ POLIMAXBag (trimmed) ------
+        class POLIMAXBag {
+            // LENGTH = long side (meters), WIDTH = short side (meters)
+            static BAG_LENGTH = 0.925; // 462.5 mm (Z)
+            static BAG_WIDTH = 0.5667; // 283.35 mm (X)
+            static BAG_HEIGHT = 0.28;
+            static GAP = 0.15;
+
+            constructor() {
+                this.geometry = this.createGeometry();
+                this.textures = { top: TextureFactory.createTopTexture(-Math.PI/2), side: TextureFactory.createSideTexture(POLIMAXBag.BAG_LENGTH, POLIMAXBag.BAG_HEIGHT), blank: TextureFactory.createBlankTexture() };
+                this.materials = this.createMaterials();
+            }
+
+            createGeometry() {
+                const segments = 24;
+                const geo = new THREE.BoxGeometry(POLIMAXBag.BAG_WIDTH, POLIMAXBag.BAG_HEIGHT, POLIMAXBag.BAG_LENGTH, segments, segments, segments);
+                const pos = geo.attributes.position; const v3 = new THREE.Vector3();
+                for (let i=0;i<pos.count;i++){
+                    v3.fromBufferAttribute(pos,i);
+                    const nx = v3.x/(POLIMAXBag.BAG_WIDTH/2), ny = v3.y/(POLIMAXBag.BAG_HEIGHT/2), nz = v3.z/(POLIMAXBag.BAG_LENGTH/2);
+                    const endCurve = Math.pow(Math.abs(nz),2.2);
+                    v3.y *= (1 - endCurve * 0.25);
+                    v3.x *= (1 - endCurve * 0.08);
+                    const sideConvex = 0.22 * (1 - nz * nz * 0.2) * (1 - ny * ny * 0.3);
+                    v3.x += (v3.x > 0 ? 1 : -1) * sideConvex;
+                    const frontConvex = 0.12 * (1 - nx * nx * 0.3) * (1 - ny * ny * 0.3);
+                    v3.z += (v3.z > 0 ? 1 : -1) * frontConvex;
+                    pos.setXYZ(i, v3.x, v3.y, v3.z);
+                }
+
+                // UVs: Top/Bottom use X/Z, Sides use Z/Y
+                const uv = geo.attributes.uv;
+                for (let i=0;i<pos.count;i++){
+                    v3.fromBufferAttribute(pos,i);
+                    const normalX = geo.attributes.normal.getX(i);
+                    const normalY = geo.attributes.normal.getY(i);
+                    if (Math.abs(normalY) > 0.5) {
+                        if (normalY > 0) uv.setXY(i, (v3.x / POLIMAXBag.BAG_WIDTH) + 0.5, 1.0 - ((v3.z / POLIMAXBag.BAG_LENGTH) + 0.5));
+                        else uv.setXY(i, (v3.x / POLIMAXBag.BAG_WIDTH) + 0.5, (v3.z / POLIMAXBag.BAG_LENGTH) + 0.5);
+                    } else if (Math.abs(normalX) > 0.5) {
+                        const u = (v3.z / POLIMAXBag.BAG_LENGTH) + 0.5;
+                        const v = 1.0 - ((v3.y / POLIMAXBag.BAG_HEIGHT) + 0.5);
+                        uv.setXY(i, u, v);
+                    }
+                }
+                geo.computeVertexNormals();
+                return geo;
+            }
+
+            createMaterials() {
+                // Make bag slightly translucent and add a subtle bump on top to match original look
+                const leftMat = new THREE.MeshStandardMaterial({ map: this.textures.side, roughness:0.5, metalness:0.05, side: THREE.DoubleSide, transparent: true, opacity: 0.92 });
+                const rightMat = new THREE.MeshStandardMaterial({ color:0xffffff, roughness:0.6, side: THREE.DoubleSide, transparent: true, opacity: 0.92 });
+                const topMat = new THREE.MeshStandardMaterial({ map: this.textures.top, roughness:0.45, metalness:0.05, bumpMap:this.textures.top, bumpScale:0.0009, side: THREE.DoubleSide, transparent: true, opacity: 0.96 });
+                const bottomMat = topMat.clone();
+                const frontMat = new THREE.MeshStandardMaterial({ color:0xffffff, roughness:0.6, transparent: true, opacity: 0.92 });
+                const backMat = new THREE.MeshStandardMaterial({ color:0xffffff, roughness:0.6, transparent: true, opacity: 0.92 });
+                return [ rightMat, leftMat, topMat, bottomMat, frontMat, backMat ];
+            }
+
+            createInstance(posX,posY,posZ, rotationY=0, uvRot=0) {
+                const clonedMats = this.materials.map(m => m.clone());
+                clonedMats.forEach((mat, idx) => {
+                    if (mat.map) {
+                        const t = mat.map.clone(); t.center = t.center ? t.center.clone() : new THREE.Vector2(0.5,0.5); t.center.set(0.5,0.5);
+                        t.rotation = (t.rotation || 0) + rotationY + (uvRot || 0);
+                        t.needsUpdate = true; mat.map = t;
+                    }
+                });
+                const mesh = new THREE.Mesh(this.geometry, clonedMats);
+                mesh.castShadow = true; mesh.receiveShadow = true;
+                // small pellets
+                const pelletGroup = new THREE.Group();
+                for (let i=0;i<20;i++){ const size = 0.008 + Math.random()*0.006; const pellet = new THREE.Mesh(new THREE.SphereGeometry(size,4,4), new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.4,opacity:0.2,transparent:true})); pellet.position.x=(Math.random()-0.5)*0.6; pellet.position.y=(Math.random()-0.3)*0.15; pellet.position.z=(Math.random()-0.5)*0.4; pelletGroup.add(pellet); }
+                mesh.add(pelletGroup);
+                mesh.position.set(posX,posY,posZ); mesh.rotation.y = rotationY; return mesh;
+            }
+        }
+
+        // ------ PlasticPallet (copied) ------
+        class PlasticPallet {
+            constructor(width = 2.0, depth = 2.4, height = 0.15) {
+                this.width = width; this.depth = depth; this.height = height; this.group = new THREE.Group(); this.create();
+            }
+            create() {
+                const color = 0x6b7c8d; const legColor = 0x5a6b7c;
+                const topDeck = new THREE.Mesh(new THREE.BoxGeometry(this.width, 0.018, this.depth), new THREE.MeshStandardMaterial({ color, roughness:0.75, metalness:0.15 }));
+                topDeck.position.y = this.height - 0.01; topDeck.castShadow = topDeck.receiveShadow = true; this.group.add(topDeck);
+                const bottomDeck = new THREE.Mesh(new THREE.BoxGeometry(this.width - 0.1, 0.016, this.depth - 0.1), new THREE.MeshStandardMaterial({ color: legColor, roughness: 0.8 }));
+                bottomDeck.position.y = 0.01; bottomDeck.castShadow = bottomDeck.receiveShadow = true; this.group.add(bottomDeck);
+                const legGeo = new THREE.BoxGeometry(0.16, this.height - 0.03, 0.16); const legMat = new THREE.MeshStandardMaterial({ color: legColor, roughness: 0.8 });
+                const xPos = [-0.7, 0, 0.7]; const zPos = [-0.9, 0, 0.9];
+                xPos.forEach(x => { zPos.forEach(z => { const leg = new THREE.Mesh(legGeo, legMat); leg.position.set(x, this.height/2, z); this.group.add(leg); }); });
+                const beamMat = new THREE.MeshStandardMaterial({ color: legColor, roughness: 0.7 });
+                [-0.7,0,0.7].forEach(x=>{ const beam = new THREE.Mesh(new THREE.BoxGeometry(0.1,0.05,this.depth-0.4), beamMat); beam.position.set(x, this.height/2.5, 0); this.group.add(beam); });
+                [-0.9,0,0.9].forEach(z=>{ const beam = new THREE.Mesh(new THREE.BoxGeometry(this.width-0.4,0.05,0.1), beamMat); beam.position.set(0,this.height/2.5,z); this.group.add(beam); });
+            }
+            get(){ return this.group; }
+            setPosition(x,y,z){ this.group.position.set(x,y,z); }
+        }
+
+        // ------ Scene setup ------
+        const scene = new THREE.Scene(); scene.background = new THREE.Color(0x111216);
+        const camera = new THREE.PerspectiveCamera(40, innerWidth/innerHeight, 0.1, 100); camera.position.set(1.6,0.9,2.6);
+        const renderer = new THREE.WebGLRenderer({ antialias:true }); renderer.setSize(innerWidth, innerHeight); renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        // tone mapping + exposure to better match polimaxxV2 visuals
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.2;
+        document.body.appendChild(renderer.domElement);
+        const controls = new OrbitControls(camera, renderer.domElement); controls.enableDamping = true; controls.target.set(0,0.12,0);
+
+        // Ambient + hemisphere + main directional + fill + back lights (match polimaxxV2)
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8); scene.add(ambientLight);
+        const hemi = new THREE.HemisphereLight(0xffffff, 0x111122, 0.5); scene.add(hemi);
+
+        const mainLight = new THREE.DirectionalLight(0xfff5e6, 1.5);
+        mainLight.position.set(4, 7, 6);
+        mainLight.castShadow = true;
+        mainLight.shadow.mapSize.width = 1024;
+        mainLight.shadow.mapSize.height = 1024;
+        scene.add(mainLight);
+
+        const fillLight = new THREE.PointLight(0x88aacc, 0.5);
+        fillLight.position.set(-3, 2, 5);
+        scene.add(fillLight);
+
+        const backLight = new THREE.DirectionalLight(0xccaa88, 0.3);
+        backLight.position.set(-2, 1, -6);
+        scene.add(backLight);
+
+        // ground + grid
+        const ground = new THREE.Mesh(new THREE.PlaneGeometry(10,10), new THREE.MeshStandardMaterial({ color:0x1e2228, roughness:0.95 })); ground.rotation.x = -Math.PI/2; ground.position.y = -0.25; ground.receiveShadow = true; scene.add(ground);
+        const grid = new THREE.GridHelper(6, 12, 0x444b55, 0x15171a); grid.position.y = -0.249; scene.add(grid);
+
+        // create extraGroup: pallet + one bag, then wrap in masterGroup so whole demo can be transformed
+        const extraGroup = new THREE.Group();
+        const pallet = new PlasticPallet(); pallet.setPosition(0, -0.15, 0); extraGroup.add(pallet.get());
+        const bagFactory = new POLIMAXBag();
+        const bagMesh = bagFactory.createInstance(0, 0.2, 0, 0, 0);
+        extraGroup.add(bagMesh);
+
+        // masterGroup contains the entire demo (pallet + bag + labels). Use this for single transforms.
+        const masterGroup = new THREE.Group();
+        masterGroup.add(extraGroup);
+        scene.add(masterGroup);
+
+        // improve texture sampling
+        try {
+            const maxAniso = renderer.capabilities.getMaxAnisotropy();
+            if (bagFactory.textures && bagFactory.textures.side) { bagFactory.textures.side.anisotropy = Math.max(4, Math.min(16, maxAniso)); bagFactory.textures.side.magFilter = THREE.LinearFilter; bagFactory.textures.side.minFilter = THREE.LinearMipMapLinearFilter; bagFactory.textures.side.encoding = THREE.sRGBEncoding; bagFactory.textures.side.needsUpdate = true; }
+            if (bagFactory.textures && bagFactory.textures.top) { bagFactory.textures.top.anisotropy = Math.max(4, Math.min(16, maxAniso)); bagFactory.textures.top.needsUpdate = true; }
+        } catch (err) {}
+
+        // --- Draw index badge onto each face material map (so numbers appear on the bag surfaces) ---
+        function applyIndexToFace(mesh, faceIndex, idxNumber) {
+            const mat = mesh.material[faceIndex];
+            if (!mat) return;
+
+            // determine base image size
+            let baseW = 512, baseH = 512;
+            let baseImg = null;
+            if (mat.map && mat.map.image) {
+                baseImg = mat.map.image;
+                baseW = baseImg.width || baseW;
+                baseH = baseImg.height || baseH;
+            }
+
+            const cvs = document.createElement('canvas'); cvs.width = baseW; cvs.height = baseH;
+            const ctx = cvs.getContext('2d');
+
+            // draw original base (if present)
+            if (baseImg) ctx.drawImage(baseImg, 0, 0, baseW, baseH);
+            else { ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,baseW,baseH); }
+
+            // badge background (semi-transparent). default bottom-right; adjust per-face below
+            const badgeW = Math.round(baseW * 0.18);
+            const badgeH = Math.round(baseH * 0.18);
+            const margin = Math.round(baseW * 0.04);
+            let bx = baseW - badgeW - margin;
+            let by = baseH - badgeH - margin;
+
+            // per-face adjustments:
+            // faceIndex 5 (printed index 6): place at top-right
+            // faceIndex 0 (printed index 1): rotate text 180° (upside-down)
+            // faceIndex 1 (printed index 2): mirror text horizontally
+            const rotateDeg = (faceIndex === 0) ? 180 : 0;
+            const flipH = (faceIndex === 1);
+            if (faceIndex === 5) {
+                by = margin; // top-right
+            }
+
+            ctx.fillStyle = 'rgba(0,0,0,0.45)';
+            ctx.beginPath();
+            const r = Math.round(badgeH * 0.18);
+            ctx.moveTo(bx + r, by);
+            ctx.arcTo(bx + badgeW, by, bx + badgeW, by + badgeH, r);
+            ctx.arcTo(bx + badgeW, by + badgeH, bx, by + badgeH, r);
+            ctx.arcTo(bx, by + badgeH, bx, by, r);
+            ctx.arcTo(bx, by, bx + badgeW, by, r);
+            ctx.closePath(); ctx.fill();
+
+            // index number (apply rotation/mirroring for text only)
+            ctx.save();
+            // center for text
+            const tx = bx + badgeW/2;
+            const ty = by + badgeH/2 + 2;
+            ctx.translate(tx, ty);
+            if (flipH) ctx.scale(-1, 1);
+            if (rotateDeg !== 0) ctx.rotate(rotateDeg * Math.PI / 180);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = Math.round(badgeH * 0.6) + 'px sans-serif';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(String(idxNumber), 0, 0);
+            ctx.restore();
+
+            const newTex = new THREE.CanvasTexture(cvs);
+            newTex.needsUpdate = true;
+            newTex.encoding = THREE.sRGBEncoding;
+            newTex.wrapS = THREE.ClampToEdgeWrapping;
+            newTex.wrapT = THREE.ClampToEdgeWrapping;
+
+            mat.map = newTex;
+            mat.needsUpdate = true;
+        }
+
+        // apply index badges 1..6 to bagMesh materials
+        for (let fi = 0; fi < 6; fi++) {
+            applyIndexToFace(bagMesh, fi, fi + 1);
+        }
+
+        // Utility: apply canvas-level orientation transforms to a material's texture
+        // options: { flipH, flipV, rotate180 }
+        function applyOrientationToMaterial(mat, options = {}) {
+            if (!mat || !mat.map || !mat.map.image) return;
+            const src = mat.map.image;
+            const cvs = document.createElement('canvas'); cvs.width = src.width; cvs.height = src.height;
+            const ctx = cvs.getContext('2d');
+
+            // default no-op
+            ctx.save();
+            // translate to center for rotation/scaling
+            ctx.translate(cvs.width/2, cvs.height/2);
+            if (options.rotate180) ctx.rotate(Math.PI);
+            const scaleX = options.flipH ? -1 : 1;
+            const scaleY = options.flipV ? -1 : 1;
+            ctx.scale(scaleX, scaleY);
+            // draw centered
+            ctx.drawImage(src, -cvs.width/2, -cvs.height/2, cvs.width, cvs.height);
+            ctx.restore();
+
+            const newTex = new THREE.CanvasTexture(cvs);
+            newTex.needsUpdate = true; newTex.encoding = THREE.sRGBEncoding; newTex.wrapS = THREE.ClampToEdgeWrapping; newTex.wrapT = THREE.ClampToEdgeWrapping;
+            mat.map = newTex; mat.needsUpdate = true;
+        }
+
+        // The side artwork is applied to material index 1 (left face). The user reports
+        // the artwork appears upside-down and mirrored; apply a combined transform
+        // (flip horizontally + rotate 180°) which corrects that orientation for the
+        // current UV layout. If this still isn't exact we expose quick toggles next.
+        try {
+            const leftMat = bagMesh.material[1];
+            applyOrientationToMaterial(leftMat, { flipH: true, flipV: false, rotate180: true });
+        } catch (e) { console.warn('applyOrientationToMaterial failed', e); }
+
+        // material index ad-hoc fixes removed; side texture now created with correct
+        // physical aspect ratio and orientation. If further per-face correction is
+        // needed we will apply a targeted canvas transform after inspecting UVs.
+
+        // edge line for pallet
+        const edgeMat = new THREE.LineBasicMaterial({ color: 0xf37021 });
+        const points = [ [-1.0, 0.16, -1.2], [1.0, 0.16, -1.2], [1.0, 0.16, 1.2], [-1.0, 0.16, 1.2], [-1.0, 0.16, -1.2] ];
+        const lineGeometry = new THREE.BufferGeometry().setFromPoints(points.map(p => new THREE.Vector3(p[0], p[1], p[2])));
+        scene.add(new THREE.Line(lineGeometry, edgeMat));
+
+        // --- Face label sprites (reduced) ---
+        function makeLabelSprite(text, options = {}){
+            const size = options.size || 256; const canvas = document.createElement('canvas'); canvas.width=size; canvas.height=size; const ctx=canvas.getContext('2d'); ctx.fillStyle = options.bg || 'rgba(0,0,0,0.6)'; ctx.fillRect(0,0,size,size); ctx.fillStyle = options.color || '#fff'; ctx.font = (options.fontSize || 72) + 'px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(text, size/2, size/2); const tex=new THREE.CanvasTexture(canvas); const mat=new THREE.SpriteMaterial({ map:tex, depthTest:false, depthWrite:false }); const s=new THREE.Sprite(mat); s.scale.set(options.scale||0.28, options.scale||0.28,1); return s; }
+        const labels = {};
+        const off = 0.12;
+        labels.right = makeLabelSprite('Right',{fontSize:64, scale:0.25}); labels.right.position.set((POLIMAXBag.BAG_WIDTH/2)+off,0,0); bagMesh.add(labels.right);
+        labels.left = makeLabelSprite('Left',{fontSize:64, scale:0.25}); labels.left.position.set(-(POLIMAXBag.BAG_WIDTH/2)-off,0,0); bagMesh.add(labels.left);
+        labels.top = makeLabelSprite('Top',{fontSize:64, scale:0.25}); labels.top.position.set(0,(POLIMAXBag.BAG_HEIGHT/2)+off,0); bagMesh.add(labels.top);
+        labels.bottom = makeLabelSprite('Bottom',{fontSize:64, scale:0.25}); labels.bottom.position.set(0,-(POLIMAXBag.BAG_HEIGHT/2)-off,0); bagMesh.add(labels.bottom);
+        labels.front = makeLabelSprite('Front',{fontSize:64, scale:0.25}); labels.front.position.set(0,0,(POLIMAXBag.BAG_LENGTH/2)+off); bagMesh.add(labels.front);
+        labels.back = makeLabelSprite('Back',{fontSize:64, scale:0.25}); labels.back.position.set(0,0,-(POLIMAXBag.BAG_LENGTH/2)-off); bagMesh.add(labels.back);
+        Object.values(labels).forEach(s=>s.visible=false);
+
+        // UI panel (controls)
+        const ctrl = document.createElement('div'); ctrl.style.position='absolute'; ctrl.style.top='18px'; ctrl.style.right='18px'; ctrl.style.background='rgba(0,0,0,0.6)'; ctrl.style.color='#fff'; ctrl.style.padding='10px'; ctrl.style.borderRadius='8px'; ctrl.style.zIndex=999; ctrl.innerHTML='<strong>Bag Controls</strong><br/>';
+        const faces = ['right','left','top','bottom','front','back'];
+        faces.forEach(face => { const id='chk_'+face; const cb=document.createElement('input'); cb.type='checkbox'; cb.id=id; cb.style.marginRight='6px'; const label=document.createElement('label'); label.htmlFor=id; label.style.marginRight='10px'; label.textContent=face; cb.addEventListener('change', ()=>{ labels[face].visible = cb.checked; }); ctrl.appendChild(cb); ctrl.appendChild(label); ctrl.appendChild(document.createElement('br')); });
+        const master=document.createElement('input'); master.type='checkbox'; master.id='chk_all'; master.style.marginRight='6px'; const masterLabel=document.createElement('label'); masterLabel.htmlFor='chk_all'; masterLabel.textContent='show all'; masterLabel.style.userSelect='none'; master.addEventListener('change', ()=>{ faces.forEach(face => { const cb = document.getElementById('chk_'+face); if (cb) { cb.checked = master.checked; labels[face].visible = master.checked; } }); }); ctrl.appendChild(master); ctrl.appendChild(masterLabel);
+        document.body.appendChild(ctrl);
+
+        // Move/rotate panel
+        const moveCtrl = document.createElement('div'); moveCtrl.style.position='absolute'; moveCtrl.style.top='120px'; moveCtrl.style.left='18px'; moveCtrl.style.background='rgba(0,0,0,0.6)'; moveCtrl.style.color='#fff'; moveCtrl.style.padding='10px'; moveCtrl.style.borderRadius='8px'; moveCtrl.style.zIndex=999; moveCtrl.innerHTML='<strong>Move extra bag</strong><br/>';
+        // X
+        const xLabel=document.createElement('div'); xLabel.style.marginTop='6px'; xLabel.textContent='X: 0.00'; const xSlider=document.createElement('input'); xSlider.type='range'; xSlider.min=-6; xSlider.max=6; xSlider.step=0.01; xSlider.value=0; xSlider.style.width='180px'; xSlider.addEventListener('input', ()=>{ const v=parseFloat(xSlider.value); masterGroup.position.x = v; xLabel.textContent='X: '+v.toFixed(2); }); moveCtrl.appendChild(xLabel); moveCtrl.appendChild(xSlider);
+        // Z
+        const zLabel=document.createElement('div'); zLabel.style.marginTop='8px'; zLabel.textContent='Z: 0.00'; const zSlider=document.createElement('input'); zSlider.type='range'; zSlider.min=-6; zSlider.max=6; zSlider.step=0.01; zSlider.value=0; zSlider.style.width='180px'; zSlider.addEventListener('input', ()=>{ const v=parseFloat(zSlider.value); masterGroup.position.z = v; zLabel.textContent='Z: '+v.toFixed(2); }); moveCtrl.appendChild(zLabel); moveCtrl.appendChild(zSlider);
+        // Y mode + slider
+        const yModeWrap=document.createElement('div'); yModeWrap.style.marginTop='8px'; const yModeChk=document.createElement('input'); yModeChk.type='checkbox'; yModeChk.id='chk_y_whole'; yModeChk.style.marginRight='6px'; const yModeLbl=document.createElement('label'); yModeLbl.htmlFor='chk_y_whole'; yModeLbl.textContent='Lift whole pile'; yModeLbl.style.userSelect='none'; yModeWrap.appendChild(yModeChk); yModeWrap.appendChild(yModeLbl); moveCtrl.appendChild(yModeWrap);
+        const yLabel=document.createElement('div'); yLabel.style.marginTop='8px'; yLabel.textContent='Y: 0.20'; const ySlider=document.createElement('input'); ySlider.type='range'; ySlider.min=-1; ySlider.max=4; ySlider.step=0.01; ySlider.value=bagMesh.position.y; ySlider.style.width='180px'; ySlider.addEventListener('input', ()=>{ const v=parseFloat(ySlider.value); if (yModeChk.checked) masterGroup.position.y = v; else bagMesh.position.y = Math.max(v, 0.12); yLabel.textContent='Y: '+v.toFixed(2); }); moveCtrl.appendChild(yLabel); moveCtrl.appendChild(ySlider);
+        // Rotation
+        const rotHeader=document.createElement('div'); rotHeader.style.marginTop='12px'; rotHeader.style.fontWeight='bold'; rotHeader.textContent='Rotate extra bag'; moveCtrl.appendChild(rotHeader);
+        const rLabel=document.createElement('div'); rLabel.style.marginTop='6px'; rLabel.textContent='Y: 0°'; const rSlider=document.createElement('input'); rSlider.type='range'; rSlider.min=-180; rSlider.max=180; rSlider.step=1; rSlider.value=0; rSlider.style.width='180px'; rSlider.addEventListener('input', ()=>{ const deg=parseFloat(rSlider.value); rLabel.textContent='Y: '+deg.toFixed(0)+'°'; masterGroup.rotation.y = deg * Math.PI / 180; }); moveCtrl.appendChild(rLabel); moveCtrl.appendChild(rSlider);
+        const xRotLabel=document.createElement('div'); xRotLabel.style.marginTop='8px'; xRotLabel.textContent='X: 0°'; const xRotSlider=document.createElement('input'); xRotSlider.type='range'; xRotSlider.min=-180; xRotSlider.max=180; xRotSlider.step=1; xRotSlider.value=0; xRotSlider.style.width='180px'; xRotSlider.addEventListener('input', ()=>{ const deg=parseFloat(xRotSlider.value); xRotLabel.textContent='X: '+deg.toFixed(0)+'°'; masterGroup.rotation.x = deg * Math.PI / 180; }); moveCtrl.appendChild(xRotLabel); moveCtrl.appendChild(xRotSlider);
+        document.body.appendChild(moveCtrl);
+
+        // --- Raycaster + zoom-to-cursor (same behavior) ---
+        const raycaster = new THREE.Raycaster(); const pointer = new THREE.Vector2(); renderer.domElement.style.touchAction='none';
+        window.addEventListener('pointermove', (ev) => { pointer.x = (ev.clientX / window.innerWidth) * 2 - 1; pointer.y = - (ev.clientY / window.innerHeight) * 2 + 1; }, { passive: true });
+        renderer.domElement.addEventListener('wheel', (e) => { e.preventDefault(); const zoomFactor = Math.exp(e.deltaY * 0.0015); raycaster.setFromCamera(pointer, camera); const intersects = raycaster.intersectObjects(scene.children, true); const point = new THREE.Vector3(); if (intersects.length > 0) point.copy(intersects[0].point); else raycaster.ray.at(10, point); const camToPoint = new THREE.Vector3().subVectors(camera.position, point).multiplyScalar(zoomFactor); camera.position.copy(point).add(camToPoint); const tgtToPoint = new THREE.Vector3().subVectors(controls.target, point).multiplyScalar(zoomFactor); controls.target.copy(point).add(tgtToPoint); controls.update(); }, { passive:false });
+
+        // --- Walk-in (pull) behavior copied ---
+        let isPulling=false; let pullStartY=0; let initialDistance=0; const initialHitPoint=new THREE.Vector3(); const minDistance=0.35; const maxDistance=10; const pullSensitivity=0.007; const groundY=-0.25; const minCameraY=groundY+0.05;
+        function getNDCPointer(e){ return { x: (e.clientX / window.innerWidth) * 2 - 1, y: - (e.clientY / window.innerHeight) * 2 + 1 }; }
+        renderer.domElement.addEventListener('pointerdown', (e)=>{ if (e.button !== 0) return; const ndc = getNDCPointer(e); pointer.x = ndc.x; pointer.y = ndc.y; raycaster.setFromCamera(pointer, camera); const hits = raycaster.intersectObject(bagMesh, true); if (hits.length===0) return; isPulling=true; pullStartY=e.clientY; initialHitPoint.copy(hits[0].point); initialDistance=camera.position.distanceTo(initialHitPoint); controls.enabled=false; try{ renderer.domElement.setPointerCapture(e.pointerId); } catch(err){} }, { passive:false });
+        renderer.domElement.addEventListener('pointermove', (e)=>{ const ndc=getNDCPointer(e); pointer.x=ndc.x; pointer.y=ndc.y; if(!isPulling) return; const dy = e.clientY - pullStartY; const newDist = THREE.MathUtils.clamp(initialDistance + dy * pullSensitivity, minDistance, maxDistance); const camDir = new THREE.Vector3(); camera.getWorldDirection(camDir); const desiredCamPos = new THREE.Vector3().copy(initialHitPoint).add(camDir.clone().multiplyScalar(-newDist)); if (desiredCamPos.y < minCameraY) desiredCamPos.y = minCameraY; camera.position.copy(desiredCamPos); controls.target.copy(initialHitPoint); controls.update(); }, { passive:false });
+        window.addEventListener('pointerup', (e)=>{ if(!isPulling) return; isPulling=false; controls.enabled=true; try{ renderer.domElement.releasePointerCapture(e.pointerId); } catch(err){} });
+
+        // resize & animate
+        window.addEventListener('resize', ()=>{ camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+        function animate(){ requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); }
+        animate();
+    </script>
+</body>
+</html>

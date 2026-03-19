@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>POLIMAXX — 5 Bags Controller</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <script type="importmap">
+        { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }
+    </script>
+</head>
+<body>
+    <div class="badge">✨ ล็อกค่า default ได้</div>
+    
+    <div class="ui-panel">
+        <h1>POLIMAXX - 5 Bags Controller</h1>
+        <p>เลือกถุง ➔ ปรับ X / หมุน Y 90° ➔ ล็อกค่า default</p>
+        
+        <div class="control-group">
+            <label class="section-label">🔘 เลือกถุง</label>
+            <div class="bag-selector" id="bagSelector">
+                <button class="bag-btn" data-bag="5">5</button>
+                <button class="bag-btn" data-bag="4">4</button>
+                <button class="bag-btn" data-bag="3">3</button>
+                <button class="bag-btn" data-bag="2">2</button>
+                <button class="bag-btn" data-bag="1">1</button>
+            </div>
+
+            <div class="value-display" id="bagInfo">
+                ถุง 5 | X: -0.78 | หมุน Y: 0°
+            </div>
+
+            <div class="slider-group">
+                <label for="xSlider">
+                    <span>⬅️ ตำแหน่ง X ➔</span>
+                    <span id="xValue">-0.78</span>
+                </label>
+                <input type="range" id="xSlider" min="-2" max="2" step="0.01" value="-0.78" aria-label="ตำแหน่ง X">
+            </div>
+
+            <div class="slider-group">
+                <label for="gapRowsSlider">
+                    <span>🔀 แยกแถวหน้า/หลัง (Gap Rows)</span>
+                    <span id="gapRowsValue">0.00</span>
+                </label>
+                <input type="range" id="gapRowsSlider" min="0" max="1.2" step="0.01" value="0.00" aria-label="แยกแถวหน้าหลัง">
+            </div>
+
+            <div class="slider-group">
+                <label for="gapMiddleSlider">
+                    <span>↔️ แยกถุง 1 & 3 จาก 2 (Gap Middle)</span>
+                    <span id="gapMiddleValue">0.82</span>
+                </label>
+                <input type="range" id="gapMiddleSlider" min="0" max="1.5" step="0.01" value="0.82" aria-label="แยกถุงกลาง">
+            </div>
+
+            <div class="rotate-btns">
+                <button class="rotate-btn" id="rotateCW">↻ 90° ตามเข็ม</button>
+                <button class="rotate-btn" id="rotateCCW">↺ 90° ทวนเข็ม</button>
+            </div>
+        </div>
+
+        <div class="action-btns">
+            <button class="secondary-btn" id="resetBagBtn">⟲ รีเซ็ตถุงนี้</button>
+            <button class="secondary-btn" id="alignViewBtn">👁️ จ้องมอง</button>
+        </div>
+
+        <button class="lock-btn" id="lockBtn">🔒 ล็อกค่าเป็น Default</button>
+
+        <div class="default-values" id="defaultDisplay">
+            ยังไม่มีค่าที่ล็อก
+        </div>
+
+        <hr>
+
+        <div class="final-actions">
+            <button class="primary-btn" id="resetAllBtn">⟲ รีเซ็ตทั้งหมด</button>
+            <button class="primary-btn" id="applyDefaultBtn">📥 ใช้ค่าที่ล็อก</button>
+        </div>
+
+        <label class="checkbox-label" for="showIndex">
+            <input type="checkbox" id="showIndex">
+            แสดง Index Labels (ตัวเลขเล็ก)
+        </label>
+
+        <div class="slider-group">
+            <label for="indexOpacitySlider">
+                <span>🔍 ความเข้มตัวเลข (Opacity)</span>
+                <span id="indexOpacityValue">0.90</span>
+            </label>
+            <input type="range" id="indexOpacitySlider" min="0" max="1" step="0.05" value="0.90" aria-label="ความเข้มตัวเลข">
+        </div>
+
+        <label class="checkbox-label" for="showDetails">
+            <input type="checkbox" id="showDetails" checked>
+            แสดงรายละเอียดข้างถุง (1126NK, RoHS)
+        </label>
+
+        <label class="checkbox-label" for="showTopArtwork">
+            <input type="checkbox" id="showTopArtwork" checked>
+            แสดง Artwork ด้านบน (POLIMAXX Logo)
+        </label>
+
+        <hr>
+        <label style="color:#ff6666; font-weight:bold;">🔍 Debug เส้นดำ</label>
+        
+        <label class="checkbox-label" for="debugWireframe">
+            <input type="checkbox" id="debugWireframe">
+            แสดง Wireframe (ขอบโครง)
+        </label>
+        
+        <label class="checkbox-label" for="debugShadows">
+            <input type="checkbox" id="debugShadows" checked>
+            เปิด/ปิด Shadows (เงา)
+        </label>
+        
+        <div class="slider-group">
+            <label for="debugIndexOffset">
+                <span>🔍 Z-Offset Index</span>
+                <span id="debugIndexOffsetValue">0.00</span>
+            </label>
+            <input type="range" id="debugIndexOffset" min="-0.1" max="0.1" step="0.001" value="0.000" aria-label="Index Z offset">
+        </div>
+    </div>
+
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>
