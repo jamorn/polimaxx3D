@@ -168,7 +168,7 @@ export function createPolimaxxStack(sceneManager, state) {
       map: frontTexture,
       transparent: true,
       alphaTest: 0.08,
-      side: THREE.FrontSide,
+      side: THREE.DoubleSide,
       depthWrite: false,
       toneMapped: false,
     });
@@ -201,10 +201,19 @@ export function createPolimaxxStack(sceneManager, state) {
     return bagMesh.userData.frontTexture;
   }
 
+  function createCurvedDecalGeometry(width, height, yCenter, segments = 32) {
+    // plane แบนปกติ (กลับมาใช้แบบเดิมที่มองเห็นได้)
+    return new THREE.PlaneGeometry(width, height, segments, 1);
+  }
+
   function syncBagSideDecal(bagMesh) {
     if (!bagMesh) return;
 
     const frontTexture = ensureBagFrontTexture(bagMesh);
+
+    const decalWidth = state.bagWidth * 0.84;
+    const decalHeight = state.bagHeight * 0.36;
+    const decalYCenter = state.bagHeight * 0.05;
 
     let sideDecal = bagMesh.userData[SIDE_DECAL_KEY];
     if (!sideDecal) {
@@ -219,15 +228,12 @@ export function createPolimaxxStack(sceneManager, state) {
     }
 
     const previousGeometry = sideDecal.geometry;
-    sideDecal.geometry = new THREE.PlaneGeometry(
-      state.bagWidth * 0.84,
-      state.bagHeight * 0.36,
-    );
+    sideDecal.geometry = new THREE.PlaneGeometry(decalWidth, decalHeight);
     if (previousGeometry) previousGeometry.dispose();
 
     sideDecal.position.set(
       0,
-      state.bagHeight * 0.05,
+      decalYCenter,
       state.bagLength / 2 + getScaledFrontBulgeZ() + 0.003,
     );
 
