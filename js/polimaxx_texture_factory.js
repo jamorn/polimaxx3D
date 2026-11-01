@@ -7,6 +7,40 @@ export class PolimaxxTextureFactory {
   // แคช QR (สร้างครั้งเดียวจาก string) — เก็บเป็น matrix ของโมดูล
   static qrCache = new Map();
 
+  // แคชโลโก้ MFG (SVG) — โหลดครั้งเดียว แล้วใช้ซ้ำทุกถุง
+  static mfgLogo = null;
+  static mfgLogoListeners = new Set();
+
+  static mfgLogoUrl = new URL("../images/mfg.svg", import.meta.url).href;
+
+  static loadMfgLogo(url = PolimaxxTextureFactory.mfgLogoUrl) {
+    if (PolimaxxTextureFactory.mfgLogo) return;
+    const image = new Image();
+    image.onload = () => {
+      PolimaxxTextureFactory.mfgLogo = image;
+      PolimaxxTextureFactory.mfgLogoListeners.forEach((callback) =>
+        callback(image),
+      );
+      PolimaxxTextureFactory.mfgLogoListeners.clear();
+    };
+    image.onerror = () => {
+      PolimaxxTextureFactory.mfgLogoListeners.forEach((callback) =>
+        callback(null),
+      );
+      PolimaxxTextureFactory.mfgLogoListeners.clear();
+    };
+    image.src = url;
+  }
+
+  static onMfgLogoReady(callback) {
+    if (PolimaxxTextureFactory.mfgLogo) {
+      callback(PolimaxxTextureFactory.mfgLogo);
+      return () => {};
+    }
+    PolimaxxTextureFactory.mfgLogoListeners.add(callback);
+    return () => PolimaxxTextureFactory.mfgLogoListeners.delete(callback);
+  }
+
   static getQrModules(text) {
     const key = String(text ?? "");
     if (!PolimaxxTextureFactory.qrCache.has(key)) {
@@ -125,6 +159,9 @@ export class PolimaxxTextureFactory {
   ) {
     const resolved = { ...DEFAULT_SIDE_LABEL, ...sideLabel };
 
+    // เริ่มโหลดโลโก้ MFG (ครั้งเดียว) ถ้ายังไม่มี
+    PolimaxxTextureFactory.loadMfgLogo();
+
     const canvas = document.createElement("canvas");
     canvas.width = 4096;
     canvas.height = 1024;
@@ -207,25 +244,38 @@ export class PolimaxxTextureFactory {
     const symbolY = midY;
 
     if (resolved.showDiamond) {
-      ctx.lineWidth = 14;
-      ctx.strokeStyle = "#000";
-      ctx.beginPath();
-      ctx.moveTo(symbolX, symbolY - 75);
-      ctx.lineTo(symbolX + 75, symbolY);
-      ctx.lineTo(symbolX, symbolY + 75);
-      ctx.lineTo(symbolX - 75, symbolY);
-      ctx.closePath();
-      ctx.stroke();
+      const logo = PolimaxxTextureFactory.mfgLogo;
 
-      ctx.beginPath();
-      ctx.moveTo(symbolX, symbolY - 75);
-      ctx.lineTo(symbolX, symbolY + 75);
-      ctx.stroke();
+      if (logo) {
+        // โลโก้ MFG จาก SVG — วาดให้สูง ~150px, คงสัดส่วนตามรูป
+        const logoHeight = 150;
+        const ratio = logo.width / logo.height || 1;
+        const logoWidth = logoHeight * ratio;
+        const logoX = symbolX - logoWidth / 2;
+        const logoY = symbolY - logoHeight / 2;
+        ctx.drawImage(logo, logoX, logoY, logoWidth, logoHeight);
+      } else {
+        // fallback: สัญลักษณ์ข้าวหลามตัดเดิม จนกว่าโลโก้จะโหลดเสร็จ
+        ctx.lineWidth = 14;
+        ctx.strokeStyle = "#000";
+        ctx.beginPath();
+        ctx.moveTo(symbolX, symbolY - 75);
+        ctx.lineTo(symbolX + 75, symbolY);
+        ctx.lineTo(symbolX, symbolY + 75);
+        ctx.lineTo(symbolX - 75, symbolY);
+        ctx.closePath();
+        ctx.stroke();
 
-      ctx.beginPath();
-      ctx.moveTo(symbolX - 35, symbolY);
-      ctx.lineTo(symbolX + 35, symbolY);
-      ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(symbolX, symbolY - 75);
+        ctx.lineTo(symbolX, symbolY + 75);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(symbolX - 35, symbolY);
+        ctx.lineTo(symbolX + 35, symbolY);
+        ctx.stroke();
+      }
     }
 
     ctx.font = "bold 60px sans-serif";

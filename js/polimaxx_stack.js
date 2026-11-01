@@ -243,6 +243,22 @@ export function createPolimaxxStack(sceneManager, state) {
 
   bags.forEach((mesh) => syncBagSideDecal(mesh));
 
+  // เมื่อโลโก้ MFG โหลดเสร็จ ให้สร้าง front texture ใหม่ให้ทุกถุง
+  let mfgLogoApplied = false;
+  PolimaxxTextureFactory.onMfgLogoReady((logo) => {
+    if (!logo || mfgLogoApplied) return;
+    mfgLogoApplied = true;
+    frontTextureCache.clear();
+    getAllBags().forEach((mesh) => {
+      mesh.userData.frontTexture = ensureBagFrontTexture(mesh);
+      const sideDecal = mesh.userData[SIDE_DECAL_KEY];
+      if (sideDecal) {
+        sideDecal.material.map = mesh.userData.frontTexture;
+        sideDecal.material.needsUpdate = true;
+      }
+    });
+  });
+
   function normalizeRotationY(angle) {
     return THREE.MathUtils.euclideanModulo(angle, Math.PI * 2);
   }
