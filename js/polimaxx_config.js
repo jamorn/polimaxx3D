@@ -85,7 +85,7 @@ export function createInitialState() {
     visibleLayerCount: TOTAL_LAYERS,
     wallOpacity: 0.4,
     wallColor: "#fc182f",
-    palletOpacity: 0.75,
+    palletOpacity: 1,
     palletColor: "#021ef2",
   };
 }
