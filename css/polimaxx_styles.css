@@ -135,15 +135,46 @@ button.active:hover {
         font-size: 13px;
     }
 
-    .lil-gui.root {
+            .lil-gui.root {
         top: 84px;
         right: 10px;
-        --width: 260px;
-        width: 260px !important;
+        left: auto;
+        --width: 320px;
+        width: calc(100vw - 20px) !important;
+        max-width: 320px;
     }
 
     .lil-gui.root > .children {
         max-height: calc(100vh - 104px);
+        max-height: calc(100dvh - 104px);
+    }
+}
+
+/* มือถือแนวนอน (จอเตี้ย): ลดระยะ top ลงให้ lil-gui มีที่มากขึ้น */
+@media (max-height: 500px) and (hover: none) and (pointer: coarse) {
+    .controls {
+        top: 6px;
+        left: 6px;
+        right: 6px;
+        padding: 6px;
+        gap: 4px;
+    }
+
+    .controls button {
+        padding: 4px 10px;
+        font-size: 12px;
+    }
+
+            .lil-gui.root {
+        top: 56px;
+        right: 6px;
+        left: auto;
+        width: calc(100vw - 12px) !important;
+    }
+
+    .lil-gui.root > .children {
+        max-height: calc(100vh - 66px);
+        max-height: calc(100dvh - 66px);
     }
 }
 
