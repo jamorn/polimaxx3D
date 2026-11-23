@@ -21,6 +21,26 @@ function getSafeAnisotropy() {
   return 16;
 }
 
+// คืนระดับสเกลของ canvas texture ตามอุปกรณ์
+// 1 = เต็ม (desktop), ต่ำกว่า 1 = canvas เล็กลง เพื่อลด RAM/VRAM บนมือถือ
+// ปัญหาหลักที่ทำให้ iPad reload: texture 4096x1024 จำนวน 40 ใบ (1 ต่อ bag)
+// กิน RAM มหาศาลจน WebKit ตัด WebGL context
+function getTextureScale() {
+  if (typeof navigator === "undefined") return 1;
+  const ua = navigator.userAgent || "";
+  const isIPadOS =
+    navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
+  const isIOS = /iPad|iPhone|iPod/.test(ua) || isIPadOS;
+  const isTouch =
+    (window.matchMedia &&
+      window.matchMedia("(hover: none) and (pointer: coarse)").matches) ||
+    navigator.maxTouchPoints > 0;
+
+  if (isIOS) return 0.25; // 4096x1024 -> 1024x256, 2048x2048 -> 512x512
+  if (isTouch) return 0.5; // 4096x1024 -> 2048x512
+  return 1;
+}
+
 export class PolimaxxTextureFactory {
   // แคช QR (สร้างครั้งเดียวจาก string) — เก็บเป็น matrix ของโมดูล
   static qrCache = new Map();
@@ -97,15 +117,21 @@ export class PolimaxxTextureFactory {
   }
 
   static createTopTexture(backgroundColor = "#ffffff") {
+    // พิกัดวาดทั้งหมดอ้างอิง canvas เชิงตรรกะ 2048x2048
+    const logicalSize = 2048;
+    const scale = getTextureScale();
     const canvas = document.createElement("canvas");
-    canvas.width = 2048;
-    canvas.height = 2048;
+    canvas.width = Math.round(logicalSize * scale);
+    canvas.height = Math.round(logicalSize * scale);
     const ctx = canvas.getContext("2d");
 
-    ctx.fillStyle = backgroundColor;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // สเกล context ให้พิกัดเดิม (0..2048) ยังใช้ได้ แต่ canvas จริงเล็กลง
+    ctx.scale(canvas.width / logicalSize, canvas.height / logicalSize);
 
-    const centerX = canvas.width / 2;
+    ctx.fillStyle = backgroundColor;
+    ctx.fillRect(0, 0, logicalSize, logicalSize);
+
+    const centerX = logicalSize / 2;
     ctx.textAlign = "center";
 
     ctx.fillStyle = "#0e3a66";
@@ -180,12 +206,19 @@ export class PolimaxxTextureFactory {
     // เริ่มโหลดโลโก้ MFG (ครั้งเดียว) ถ้ายังไม่มี
     PolimaxxTextureFactory.loadMfgLogo();
 
+    // พิกัดวาดทั้งหมดอ้างอิง canvas เชิงตรรกะ 4096x1024
+    const logicalW = 4096;
+    const logicalH = 1024;
+    const scale = getTextureScale();
     const canvas = document.createElement("canvas");
-    canvas.width = 4096;
-    canvas.height = 1024;
+    canvas.width = Math.round(logicalW * scale);
+    canvas.height = Math.round(logicalH * scale);
     const ctx = canvas.getContext("2d");
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // สเกล context ให้พิกัดเดิม (0..4096, 0..1024) ยังใช้ได้ แต่ canvas จริงเล็กลง
+    ctx.scale(canvas.width / logicalW, canvas.height / logicalH);
+
+    ctx.clearRect(0, 0, logicalW, logicalH);
     ctx.fillStyle = "#000000";
     ctx.textBaseline = "middle";
 

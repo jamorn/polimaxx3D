@@ -250,19 +250,50 @@ export function createPolimaxxStack(sceneManager, state) {
   bags.forEach((mesh) => syncBagSideDecal(mesh));
 
   // เมื่อโลโก้ MFG โหลดเสร็จ ให้สร้าง front texture ใหม่ให้ทุกถุง
+  // สำคัญ: ห้ามสร้าง 40 texture พร้อมกันใน synchronous loop เพราะ memory spike
+  // ทำให้ WebKit (iPad/Safari/Brave) ตัด WebGL context แล้วหน้า refresh หลายครั้ง
+  // จึงสร้างแบบทยอย (chunked) ด้วย setTimeout เพื่อกระจายภาระ
   let mfgLogoApplied = false;
   PolimaxxTextureFactory.onMfgLogoReady((logo) => {
     if (!logo || mfgLogoApplied) return;
     mfgLogoApplied = true;
+
+    const allBags = getAllBags();
     frontTextureCache.clear();
-    getAllBags().forEach((mesh) => {
-      mesh.userData.frontTexture = ensureBagFrontTexture(mesh);
-      const sideDecal = mesh.userData[SIDE_DECAL_KEY];
-      if (sideDecal) {
-        sideDecal.material.map = mesh.userData.frontTexture;
-        sideDecal.material.needsUpdate = true;
+
+    // สร้าง texture ใหม่ทีละใบ กระจายด้วย macro-task เพื่อไม่ให้ block + ไม่ spike
+    let cursor = 0;
+    const CHUNK = 2;
+    const disposed = new Set();
+    const step = () => {
+      if (cursor >= allBags.length) return;
+      const end = Math.min(cursor + CHUNK, allBags.length);
+      for (let i = cursor; i < end; i += 1) {
+        const mesh = allBags[i];
+        if (!mesh) continue;
+        const oldTexture = mesh.userData.frontTexture;
+        const newTexture = ensureBagFrontTexture(mesh);
+        const sideDecal = mesh.userData[SIDE_DECAL_KEY];
+        if (sideDecal) {
+          sideDecal.material.map = newTexture;
+          sideDecal.material.needsUpdate = true;
+        }
+        // คืน memory ของ texture เก่าที่ไม่ใช้แล้ว (กัน dispose ซ้ำ)
+        if (
+          oldTexture &&
+          oldTexture !== newTexture &&
+          !disposed.has(oldTexture)
+        ) {
+          disposed.add(oldTexture);
+          oldTexture.dispose();
+        }
       }
-    });
+      cursor = end;
+      if (cursor < allBags.length) {
+        setTimeout(step, 16);
+      }
+    };
+    setTimeout(step, 0);
   });
 
   function normalizeRotationY(angle) {
