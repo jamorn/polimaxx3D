@@ -14,6 +14,7 @@ import {
   TOTAL_LAYERS,
 } from "./polimaxx_config.js";
 import { PolimaxxBag } from "./polimaxx_bag.js";
+import { PolimaxxPallet } from "./polimaxx_pallet.js";
 import { PolimaxxTextureFactory } from "./polimaxx_texture_factory.js";
 
 export function createPolimaxxStack(sceneManager, state) {
@@ -508,28 +509,34 @@ export function createPolimaxxStack(sceneManager, state) {
     });
   }
 
-  const palletGeo = new THREE.BoxGeometry(
-    CONFIG.PALLET.WIDTH,
-    CONFIG.PALLET.HEIGHT,
-    CONFIG.PALLET.DEPTH,
-  );
-  const palletMat = new THREE.MeshStandardMaterial({
+  const pallet = new PolimaxxPallet({
+    width: CONFIG.PALLET.WIDTH,
+    depth: CONFIG.PALLET.DEPTH,
+    height: CONFIG.PALLET.HEIGHT,
     color: CONFIG.COLORS.PALLET,
-    transparent: true,
-    opacity: state.palletOpacity,
-    wireframe: false,
   });
-  const pallet = new THREE.Mesh(palletGeo, palletMat);
-  pallet.position.set(0, -CONFIG.PALLET.HEIGHT / 2, 0);
-  pallet.receiveShadow = true;
-  pallet.castShadow = true;
+  pallet.position.set(0, -CONFIG.PALLET.HEIGHT, 0);
+  pallet.traverse((child) => {
+    if (child.isMesh) {
+      child.castShadow = true;
+      child.receiveShadow = true;
+    }
+  });
   scene.add(pallet);
 
-  const edgeMaterial = new THREE.LineBasicMaterial({ color: 0xffaa00 });
-  const edges = new THREE.EdgesGeometry(palletGeo);
-  const wireframe = new THREE.LineSegments(edges, edgeMaterial);
-  wireframe.position.copy(pallet.position);
-  scene.add(wireframe);
+  const wireframe = pallet.topDeckWireframe;
+
+  function forEachPalletMesh(callback) {
+    pallet.traverse((child) => {
+      if (
+        child.isMesh &&
+        child.material &&
+        child.material !== pallet.rubberMaterial
+      ) {
+        callback(child);
+      }
+    });
+  }
 
   function setPalletVisible(visible) {
     state.showPallet = visible;
@@ -538,16 +545,22 @@ export function createPolimaxxStack(sceneManager, state) {
 
   function setPalletOpacity(opacity) {
     state.palletOpacity = opacity;
-    pallet.material.opacity = opacity;
+    forEachPalletMesh((mesh) => {
+      mesh.material.transparent = opacity < 1;
+      mesh.material.opacity = opacity;
+      mesh.material.needsUpdate = true;
+    });
   }
 
   function setPalletColor(color) {
     state.palletColor = color;
-    pallet.material.color.set(color);
+    forEachPalletMesh((mesh) => {
+      mesh.material.color.set(color);
+    });
   }
 
   function setWireframeVisible(visible) {
-    wireframe.visible = visible;
+    pallet.setWireframe(visible);
   }
 
   const wallHeight = BASE_BAG.HEIGHT;
@@ -1404,6 +1417,8 @@ export function createPolimaxxStack(sceneManager, state) {
   }
 
   setPalletVisible(state.showPallet);
+  setPalletOpacity(state.palletOpacity);
+  setPalletColor(state.palletColor);
   setWallsVisible(state.showWalls);
   setGridVisible(state.showGrid);
   updateLayerVisibility();

@@ -11,7 +11,7 @@ export const CONFIG = {
   },
   COLORS: {
     FRAME: 0xf37021,
-    PALLET: 0x8b5a2b,
+    PALLET: 0x021ef2,
     WALL: 0xfc182f,
   },
 };
@@ -85,7 +85,7 @@ export function createInitialState() {
     visibleLayerCount: TOTAL_LAYERS,
     wallOpacity: 0.4,
     wallColor: "#fc182f",
-    palletOpacity: 0.6,
-    palletColor: "#8B5A2B",
+    palletOpacity: 0.75,
+    palletColor: "#021ef2",
   };
 }
