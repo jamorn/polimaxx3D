@@ -117,3 +117,33 @@ button.active:hover {
     box-shadow: 0 6px 14px rgba(0, 0, 0, 0.28);
     white-space: nowrap;
 }
+
+/* จอเล็ก / non-desktop: ขยับ lil-gui ลงให้พ้นแถวปุ่มด้านบน ไม่ให้ทับกัน */
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+    .controls {
+        top: 10px;
+        left: 10px;
+        right: 10px;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 6px;
+        padding: 8px;
+    }
+
+    .controls button {
+        padding: 6px 12px;
+        font-size: 13px;
+    }
+
+    .lil-gui.root {
+        top: 84px;
+        right: 10px;
+        --width: 260px;
+        width: 260px !important;
+    }
+
+    .lil-gui.root > .children {
+        max-height: calc(100vh - 104px);
+    }
+}
+
