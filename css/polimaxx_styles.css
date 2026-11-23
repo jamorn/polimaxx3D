@@ -1,8 +1,29 @@
 body {
     margin: 0;
+    width: 100%;
+    height: 100%;
     overflow: hidden;
     background: #2a2a3a;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    /* กัน bounce scroll บน iOS ที่ทำให้ viewport กระพริบ */
+    overscroll-behavior: none;
+    -webkit-text-size-adjust: 100%;
+}
+
+/* canvas ของ WebGL และ label layer ให้ซ้อนเต็มจอ คงที่ ไม่กระตุกตอน scroll */
+body > canvas,
+.label-layer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.label-layer {
+    pointer-events: none;
+    z-index: 250;
 }
 
 .controls {
@@ -79,13 +100,6 @@ button.active:hover {
 .lil-gui.root > .children::-webkit-scrollbar-thumb {
     background: #f37021;
     border-radius: 5px;
-}
-
-.label-layer {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    z-index: 250;
 }
 
 .bag-label {

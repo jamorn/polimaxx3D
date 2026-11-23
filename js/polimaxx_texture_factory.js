@@ -3,6 +3,24 @@ import QRCode from "qrcode";
 
 import { DEFAULT_SIDE_LABEL } from "./polimaxx_config.js";
 
+// จำกัด anisotropy ตามอุปกรณ์ — บน iPad/iPhone ค่า 16 กิน GPU memory/bandwidth
+// มาก ทำให้ WebKit ฆ่า tab (หน้า reload เอง) จึงลดเพดานลงบน touch device
+function getSafeAnisotropy() {
+  if (typeof navigator === "undefined") return 16;
+  const ua = navigator.userAgent || "";
+  const isIPadOS =
+    navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
+  const isIOS = /iPad|iPhone|iPod/.test(ua) || isIPadOS;
+  const isTouch =
+    (window.matchMedia &&
+      window.matchMedia("(hover: none) and (pointer: coarse)").matches) ||
+    navigator.maxTouchPoints > 0;
+
+  if (isIOS) return 4;
+  if (isTouch) return 8;
+  return 16;
+}
+
 export class PolimaxxTextureFactory {
   // แคช QR (สร้างครั้งเดียวจาก string) — เก็บเป็น matrix ของโมดูล
   static qrCache = new Map();
@@ -146,7 +164,7 @@ export class PolimaxxTextureFactory {
     ctx.fillText("NET WEIGHT 25 KG", 360, 1760);
 
     const texture = new THREE.CanvasTexture(canvas);
-    texture.anisotropy = 16;
+    texture.anisotropy = getSafeAnisotropy();
     texture.center.set(0.5, 0.5);
     texture.rotation = Math.PI;
     texture.needsUpdate = true;
@@ -329,7 +347,7 @@ export class PolimaxxTextureFactory {
     }
 
     const texture = new THREE.CanvasTexture(canvas);
-    texture.anisotropy = 16;
+    texture.anisotropy = getSafeAnisotropy();
     texture.generateMipmaps = false;
     texture.minFilter = THREE.LinearFilter;
     texture.magFilter = THREE.LinearFilter;
