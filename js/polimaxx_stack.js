@@ -175,17 +175,21 @@ export function createPolimaxxStack(sceneManager, state) {
   }
 
   const BAGS_PER_LAYER = 5;
-  const frontTextureCache = new Map();
+  const bagOverlayCache = new Map();
+  const SIDE_DECAL_OVERLAY_KEY = "sideDecalOverlay";
 
-  function getBagFrontTexture(bagNo) {
+  function getBagOverlayTexture(bagNo) {
     const key = String(bagNo);
-    if (!frontTextureCache.has(key)) {
-      frontTextureCache.set(
+    if (!bagOverlayCache.has(key)) {
+      bagOverlayCache.set(
         key,
-        PolimaxxTextureFactory.createFrontTexture(DEFAULT_SIDE_LABEL, bagNo),
+        PolimaxxTextureFactory.createBagOverlayTexture(
+          bagNo,
+          DEFAULT_SIDE_LABEL,
+        ),
       );
     }
-    return frontTextureCache.get(key);
+    return bagOverlayCache.get(key);
   }
 
   function getBagRunningNo(bagMesh) {
@@ -195,10 +199,12 @@ export function createPolimaxxStack(sceneManager, state) {
     return startNo + (layer - 1) * BAGS_PER_LAYER + indexInLayer;
   }
 
-  function ensureBagFrontTexture(bagMesh) {
+  function ensureBagOverlayTexture(bagMesh) {
     bagMesh.userData.bagNo = getBagRunningNo(bagMesh);
-    bagMesh.userData.frontTexture = getBagFrontTexture(bagMesh.userData.bagNo);
-    return bagMesh.userData.frontTexture;
+    bagMesh.userData.overlayTexture = getBagOverlayTexture(
+      bagMesh.userData.bagNo,
+    );
+    return bagMesh.userData.overlayTexture;
   }
 
   function createCurvedDecalGeometry(width, height, yCenter, segments = 32) {
@@ -209,17 +215,20 @@ export function createPolimaxxStack(sceneManager, state) {
   function syncBagSideDecal(bagMesh) {
     if (!bagMesh) return;
 
-    const frontTexture = ensureBagFrontTexture(bagMesh);
+    const staticTexture =
+      PolimaxxTextureFactory.getStaticFrontTexture(DEFAULT_SIDE_LABEL);
+    const overlayTexture = ensureBagOverlayTexture(bagMesh);
 
     const decalWidth = state.bagWidth * 0.84;
     const decalHeight = state.bagHeight * 0.36;
     const decalYCenter = state.bagHeight * 0.05;
+    const decalZ = state.bagLength / 2 + getScaledFrontBulgeZ() + 0.003;
 
     let sideDecal = bagMesh.userData[SIDE_DECAL_KEY];
     if (!sideDecal) {
       sideDecal = new THREE.Mesh(
         new THREE.PlaneGeometry(1, 1),
-        createBagSideDecalMaterial(frontTexture),
+        createBagSideDecalMaterial(staticTexture),
       );
       sideDecal.renderOrder = 10;
       sideDecal.userData.isSideDecal = true;
@@ -231,16 +240,35 @@ export function createPolimaxxStack(sceneManager, state) {
     sideDecal.geometry = new THREE.PlaneGeometry(decalWidth, decalHeight);
     if (previousGeometry) previousGeometry.dispose();
 
-    sideDecal.position.set(
-      0,
-      decalYCenter,
-      state.bagLength / 2 + getScaledFrontBulgeZ() + 0.003,
-    );
+    sideDecal.position.set(0, decalYCenter, decalZ);
 
-    if (sideDecal.material?.map !== frontTexture) {
-      sideDecal.material.map = frontTexture;
+    if (sideDecal.material?.map !== staticTexture) {
+      sideDecal.material.map = staticTexture;
     }
     sideDecal.material.needsUpdate = true;
+
+    let overlay = bagMesh.userData[SIDE_DECAL_OVERLAY_KEY];
+    if (!overlay) {
+      overlay = new THREE.Mesh(
+        new THREE.PlaneGeometry(1, 1),
+        createBagSideDecalMaterial(overlayTexture),
+      );
+      overlay.renderOrder = 11;
+      overlay.userData.isSideDecal = true;
+      bagMesh.add(overlay);
+      bagMesh.userData[SIDE_DECAL_OVERLAY_KEY] = overlay;
+    }
+
+    const previousOverlayGeometry = overlay.geometry;
+    overlay.geometry = new THREE.PlaneGeometry(decalWidth, decalHeight);
+    if (previousOverlayGeometry) previousOverlayGeometry.dispose();
+
+    overlay.position.set(0, decalYCenter, decalZ + 0.0015);
+
+    if (overlay.material?.map !== overlayTexture) {
+      overlay.material.map = overlayTexture;
+    }
+    overlay.material.needsUpdate = true;
   }
 
   function getAllBags() {
@@ -249,51 +277,22 @@ export function createPolimaxxStack(sceneManager, state) {
 
   bags.forEach((mesh) => syncBagSideDecal(mesh));
 
-  // เมื่อโลโก้ MFG โหลดเสร็จ ให้สร้าง front texture ใหม่ให้ทุกถุง
-  // สำคัญ: ห้ามสร้าง 40 texture พร้อมกันใน synchronous loop เพราะ memory spike
-  // ทำให้ WebKit (iPad/Safari/Brave) ตัด WebGL context แล้วหน้า refresh หลายครั้ง
-  // จึงสร้างแบบทยอย (chunked) ด้วย setTimeout เพื่อกระจายภาระ
+  // เมื่อโลโก้ MFG โหลดเสร็จ ให้สร้าง static front texture ใหม่เพียงใบเดียว
+  // แล้วอัปเดต side decal ของทุกถุงให้ชี้ไปที่ texture ใหม่
   let mfgLogoApplied = false;
   PolimaxxTextureFactory.onMfgLogoReady((logo) => {
     if (!logo || mfgLogoApplied) return;
     mfgLogoApplied = true;
 
-    const allBags = getAllBags();
-    frontTextureCache.clear();
+    const staticTexture =
+      PolimaxxTextureFactory.getStaticFrontTexture(DEFAULT_SIDE_LABEL);
 
-    // สร้าง texture ใหม่ทีละใบ กระจายด้วย macro-task เพื่อไม่ให้ block + ไม่ spike
-    let cursor = 0;
-    const CHUNK = 2;
-    const disposed = new Set();
-    const step = () => {
-      if (cursor >= allBags.length) return;
-      const end = Math.min(cursor + CHUNK, allBags.length);
-      for (let i = cursor; i < end; i += 1) {
-        const mesh = allBags[i];
-        if (!mesh) continue;
-        const oldTexture = mesh.userData.frontTexture;
-        const newTexture = ensureBagFrontTexture(mesh);
-        const sideDecal = mesh.userData[SIDE_DECAL_KEY];
-        if (sideDecal) {
-          sideDecal.material.map = newTexture;
-          sideDecal.material.needsUpdate = true;
-        }
-        // คืน memory ของ texture เก่าที่ไม่ใช้แล้ว (กัน dispose ซ้ำ)
-        if (
-          oldTexture &&
-          oldTexture !== newTexture &&
-          !disposed.has(oldTexture)
-        ) {
-          disposed.add(oldTexture);
-          oldTexture.dispose();
-        }
-      }
-      cursor = end;
-      if (cursor < allBags.length) {
-        setTimeout(step, 16);
-      }
-    };
-    setTimeout(step, 0);
+    getAllBags().forEach((mesh) => {
+      const sideDecal = mesh.userData[SIDE_DECAL_KEY];
+      if (!sideDecal) return;
+      sideDecal.material.map = staticTexture;
+      sideDecal.material.needsUpdate = true;
+    });
   });
 
   function normalizeRotationY(angle) {

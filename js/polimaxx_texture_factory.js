@@ -51,6 +51,11 @@ export class PolimaxxTextureFactory {
 
   static mfgLogoUrl = new URL("../images/mfg.svg", import.meta.url).href;
 
+  // แคช texture หน้า label ที่เป็น static (ไม่รวม QR2 + running number)
+  // ใช้ร่วมกันทุกถุง จึงสร้างเพียงใบเดียว
+  static staticFrontTexture = null;
+  static staticFrontSignature = null;
+
   static loadMfgLogo(url = PolimaxxTextureFactory.mfgLogoUrl) {
     if (PolimaxxTextureFactory.mfgLogo) return;
     const image = new Image();
@@ -197,26 +202,12 @@ export class PolimaxxTextureFactory {
     return texture;
   }
 
-  static createFrontTexture(
-    sideLabel = DEFAULT_SIDE_LABEL,
-    bagNo = DEFAULT_SIDE_LABEL.bagStartNo,
-  ) {
-    const resolved = { ...DEFAULT_SIDE_LABEL, ...sideLabel };
+  static getFrontLogicalSize() {
+    return { logicalW: 4096, logicalH: 1024 };
+  }
 
-    // เริ่มโหลดโลโก้ MFG (ครั้งเดียว) ถ้ายังไม่มี
-    PolimaxxTextureFactory.loadMfgLogo();
-
-    // พิกัดวาดทั้งหมดอ้างอิง canvas เชิงตรรกะ 4096x1024
-    const logicalW = 4096;
-    const logicalH = 1024;
-    const scale = getTextureScale();
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(logicalW * scale);
-    canvas.height = Math.round(logicalH * scale);
-    const ctx = canvas.getContext("2d");
-
-    // สเกล context ให้พิกัดเดิม (0..4096, 0..1024) ยังใช้ได้ แต่ canvas จริงเล็กลง
-    ctx.scale(canvas.width / logicalW, canvas.height / logicalH);
+  static drawFrontStatic(ctx, resolved) {
+    const { logicalW, logicalH } = PolimaxxTextureFactory.getFrontLogicalSize();
 
     ctx.clearRect(0, 0, logicalW, logicalH);
     ctx.fillStyle = "#000000";
@@ -225,66 +216,6 @@ export class PolimaxxTextureFactory {
     const midY = 512;
     const serialStartX = 470;
     let currentX = serialStartX;
-
-    // QR อันที่ 2 (ก่อน serial) — สร้างจาก string: 1311|grade|lot|xx|xxx
-    // โดยแยก grade และ lot จาก serial ด้วยช่องว่าง (space)
-    if (resolved.showQr2) {
-      const qr2Size = 170;
-      const qr2X = 220;
-      const qr2Y = midY - qr2Size / 2;
-
-      const [gradePart = "", lotPart = ""] = String(
-        resolved.serial ?? "",
-      ).split(" ");
-      const bagCode2 = String(bagNo).padStart(2, "0");
-      const qr2Text = `1311|${gradePart}|${lotPart}|${bagCode2}|${resolved.palletNo}`;
-
-      const drawn2 = PolimaxxTextureFactory.drawQrToContext(
-        ctx,
-        qr2Text,
-        qr2X,
-        qr2Y,
-        qr2Size,
-      );
-
-      if (!drawn2) {
-        // fallback: กล่องดำแบบเดิม ถ้าสร้าง QR ไม่ได้
-        ctx.fillStyle = "#000";
-        const module = 10;
-        const gridN = 13;
-        const pattern = [
-          [1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 0],
-          [1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 0, 1],
-          [1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 0],
-          [1, 0, 1, 1, 1, 0, 1, 1, 0, 0, 1, 0, 1],
-          [1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0],
-          [1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 1],
-          [1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 0],
-          [0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1],
-          [1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1],
-          [0, 1, 0, 1, 1, 0, 0, 1, 0, 0, 1, 0, 0],
-          [1, 1, 0, 0, 1, 1, 1, 0, 1, 0, 1, 1, 0],
-          [0, 1, 1, 0, 0, 1, 0, 1, 0, 1, 0, 0, 1],
-          [1, 0, 1, 1, 0, 0, 1, 0, 1, 1, 1, 0, 1],
-        ];
-        const qr2Pad = (qr2Size - module * gridN) / 2;
-
-        for (let row = 0; row < gridN; row += 1) {
-          for (let col = 0; col < gridN; col += 1) {
-            if (pattern[row][col]) {
-              ctx.fillRect(
-                qr2X + qr2Pad + col * module,
-                qr2Y + qr2Pad + row * module,
-                module,
-                module,
-              );
-            }
-          }
-        }
-      }
-
-      ctx.fillStyle = "#000000";
-    }
 
     ctx.textAlign = "left";
     ctx.font = "bold 130px sans-serif";
@@ -298,7 +229,6 @@ export class PolimaxxTextureFactory {
       const logo = PolimaxxTextureFactory.mfgLogo;
 
       if (logo) {
-        // โลโก้ MFG จาก SVG — วาดให้สูง ~150px, คงสัดส่วนตามรูป
         const logoHeight = 150;
         const ratio = logo.width / logo.height || 1;
         const logoWidth = logoHeight * ratio;
@@ -306,7 +236,6 @@ export class PolimaxxTextureFactory {
         const logoY = symbolY - logoHeight / 2;
         ctx.drawImage(logo, logoX, logoY, logoWidth, logoHeight);
       } else {
-        // fallback: สัญลักษณ์ข้าวหลามตัดเดิม จนกว่าโลโก้จะโหลดเสร็จ
         ctx.lineWidth = 14;
         ctx.strokeStyle = "#000";
         ctx.beginPath();
@@ -346,7 +275,6 @@ export class PolimaxxTextureFactory {
       );
 
       if (!drawn) {
-        // fallback: กล่องดำแบบเดิม ถ้าสร้าง QR ไม่ได้
         ctx.fillStyle = "#000";
         ctx.fillRect(qrX, qrY, 170, 170);
         ctx.fillStyle = "#fff";
@@ -373,11 +301,181 @@ export class PolimaxxTextureFactory {
     ctx.fillText(resolved.rohs, currentX, midY);
     currentX += ctx.measureText(resolved.rohs).width + 90;
 
+    return currentX;
+  }
+
+  static drawFrontDynamic(ctx, resolved, bagNo) {
+    const serialStartX = 470;
+    const midY = 512;
+
+    ctx.fillStyle = "#000000";
+    ctx.textBaseline = "middle";
+
+    if (resolved.showQr2) {
+      const qr2Size = 170;
+      const qr2X = 220;
+      const qr2Y = midY - qr2Size / 2;
+
+      const [gradePart = "", lotPart = ""] = String(
+        resolved.serial ?? "",
+      ).split(" ");
+      const bagCode2 = String(bagNo).padStart(2, "0");
+      const qr2Text = `1311|${gradePart}|${lotPart}|${bagCode2}|${resolved.palletNo}`;
+
+      const drawn2 = PolimaxxTextureFactory.drawQrToContext(
+        ctx,
+        qr2Text,
+        qr2X,
+        qr2Y,
+        qr2Size,
+      );
+
+      if (!drawn2) {
+        ctx.fillStyle = "#000";
+        const module = 10;
+        const gridN = 13;
+        const pattern = [
+          [1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 0],
+          [1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 0, 1],
+          [1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 0],
+          [1, 0, 1, 1, 1, 0, 1, 1, 0, 0, 1, 0, 1],
+          [1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0],
+          [1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 1],
+          [1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 0],
+          [0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1],
+          [1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1],
+          [0, 1, 0, 1, 1, 0, 0, 1, 0, 0, 1, 0, 0],
+          [1, 1, 0, 0, 1, 1, 1, 0, 1, 0, 1, 1, 0],
+          [0, 1, 1, 0, 0, 1, 0, 1, 0, 1, 0, 0, 1],
+          [1, 0, 1, 1, 0, 0, 1, 0, 1, 1, 1, 0, 1],
+        ];
+        const qr2Pad = (qr2Size - module * gridN) / 2;
+
+        for (let row = 0; row < gridN; row += 1) {
+          for (let col = 0; col < gridN; col += 1) {
+            if (pattern[row][col]) {
+              ctx.fillRect(
+                qr2X + qr2Pad + col * module,
+                qr2Y + qr2Pad + row * module,
+                module,
+                module,
+              );
+            }
+          }
+        }
+      }
+
+      ctx.fillStyle = "#000000";
+    }
+
+    const serialStartXLocal = serialStartX;
+    ctx.font = "italic bold 85px sans-serif";
+    const rohsWidth = ctx.measureText(resolved.rohs).width;
+    const numberBaseX =
+      serialStartXLocal + 1380 + 540 + 280 + 460 + rohsWidth + 90;
+
     if (resolved.showBagNo) {
+      ctx.textAlign = "left";
       const bagCode = `${String(bagNo).padStart(2, "0")}${resolved.palletNo}`;
       ctx.font = "bold 90px sans-serif";
-      ctx.fillText(bagCode, currentX, midY);
+      ctx.fillText(bagCode, numberBaseX, midY);
     }
+  }
+
+  static createStaticFrontTexture(sideLabel = DEFAULT_SIDE_LABEL) {
+    const resolved = { ...DEFAULT_SIDE_LABEL, ...sideLabel };
+
+    PolimaxxTextureFactory.loadMfgLogo();
+
+    const { logicalW, logicalH } = PolimaxxTextureFactory.getFrontLogicalSize();
+    const scale = getTextureScale();
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(logicalW * scale);
+    canvas.height = Math.round(logicalH * scale);
+    const ctx = canvas.getContext("2d");
+
+    ctx.scale(canvas.width / logicalW, canvas.height / logicalH);
+
+    PolimaxxTextureFactory.drawFrontStatic(ctx, resolved);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.anisotropy = getSafeAnisotropy();
+    texture.generateMipmaps = false;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.needsUpdate = true;
+    return texture;
+  }
+
+  static getStaticFrontTexture(sideLabel = DEFAULT_SIDE_LABEL) {
+    const resolved = { ...DEFAULT_SIDE_LABEL, ...sideLabel };
+    const signature = JSON.stringify(resolved);
+    const hasLogo = Boolean(PolimaxxTextureFactory.mfgLogo);
+
+    if (
+      PolimaxxTextureFactory.staticFrontTexture &&
+      PolimaxxTextureFactory.staticFrontSignature === `${signature}|${hasLogo}`
+    ) {
+      return PolimaxxTextureFactory.staticFrontTexture;
+    }
+
+    if (PolimaxxTextureFactory.staticFrontTexture) {
+      PolimaxxTextureFactory.staticFrontTexture.dispose();
+    }
+
+    const texture = PolimaxxTextureFactory.createStaticFrontTexture(resolved);
+    PolimaxxTextureFactory.staticFrontTexture = texture;
+    PolimaxxTextureFactory.staticFrontSignature = `${signature}|${hasLogo}`;
+    return texture;
+  }
+
+  static createBagOverlayTexture(
+    bagNo = DEFAULT_SIDE_LABEL.bagStartNo,
+    sideLabel = DEFAULT_SIDE_LABEL,
+  ) {
+    const resolved = { ...DEFAULT_SIDE_LABEL, ...sideLabel };
+
+    const { logicalW, logicalH } = PolimaxxTextureFactory.getFrontLogicalSize();
+    const scale = getTextureScale();
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(logicalW * scale);
+    canvas.height = Math.round(logicalH * scale);
+    const ctx = canvas.getContext("2d");
+
+    ctx.scale(canvas.width / logicalW, canvas.height / logicalH);
+
+    ctx.clearRect(0, 0, logicalW, logicalH);
+
+    PolimaxxTextureFactory.drawFrontDynamic(ctx, resolved, bagNo);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.anisotropy = getSafeAnisotropy();
+    texture.generateMipmaps = false;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.needsUpdate = true;
+    return texture;
+  }
+
+  static createFrontTexture(
+    sideLabel = DEFAULT_SIDE_LABEL,
+    bagNo = DEFAULT_SIDE_LABEL.bagStartNo,
+  ) {
+    const resolved = { ...DEFAULT_SIDE_LABEL, ...sideLabel };
+
+    PolimaxxTextureFactory.loadMfgLogo();
+
+    const { logicalW, logicalH } = PolimaxxTextureFactory.getFrontLogicalSize();
+    const scale = getTextureScale();
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(logicalW * scale);
+    canvas.height = Math.round(logicalH * scale);
+    const ctx = canvas.getContext("2d");
+
+    ctx.scale(canvas.width / logicalW, canvas.height / logicalH);
+
+    PolimaxxTextureFactory.drawFrontStatic(ctx, resolved);
+    PolimaxxTextureFactory.drawFrontDynamic(ctx, resolved, bagNo);
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.anisotropy = getSafeAnisotropy();
