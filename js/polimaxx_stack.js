@@ -169,7 +169,9 @@ export function createPolimaxxStack(sceneManager, state) {
     return new THREE.MeshBasicMaterial({
       map: frontTexture,
       transparent: true,
-      alphaTest: 0.08,
+      // alphaTest ต่ำ (0.01): ค่าเดิม 0.08 ตัดขอบโลโก้ MFG (SVG) ที่มี alpha ต่ำ
+      // ทิ้ง ทำให้เส้นบางๆ ของโลโก้หาย เหลือแต่แกนจาง = ดูเป็นสีเทา
+      alphaTest: 0.01,
       side: THREE.DoubleSide,
       depthWrite: false,
       toneMapped: false,
@@ -210,7 +212,7 @@ export function createPolimaxxStack(sceneManager, state) {
   }
 
   function createCurvedDecalGeometry(width, height, yCenter, segments = 32) {
-    // plane แบนปกติ (กลับมาใช้แบบเดิมที่มองเห็นได้)
+    // plane แบนปกติ (กลับมาใช้แบบเดิมที่มองเห็นครบ)
     return new THREE.PlaneGeometry(width, height, segments, 1);
   }
 
@@ -224,7 +226,8 @@ export function createPolimaxxStack(sceneManager, state) {
     const decalWidth = state.bagWidth * 0.84;
     const decalHeight = state.bagHeight * 0.36;
     const decalYCenter = state.bagHeight * 0.05;
-    const decalZ = state.bagLength / 2 + getScaledFrontBulgeZ() + 0.003;
+    // plane แบนวางที่ผิวด้านหน้า (ปูดสุดที่กลาง) + offset กัน z-fighting
+    const decalZ = state.bagLength / 2 + getScaledFrontBulgeZ() + 0.0008;
 
     let sideDecal = bagMesh.userData[SIDE_DECAL_KEY];
     if (!sideDecal) {
@@ -239,7 +242,11 @@ export function createPolimaxxStack(sceneManager, state) {
     }
 
     const previousGeometry = sideDecal.geometry;
-    sideDecal.geometry = new THREE.PlaneGeometry(decalWidth, decalHeight);
+    sideDecal.geometry = createCurvedDecalGeometry(
+      decalWidth,
+      decalHeight,
+      decalYCenter,
+    );
     if (previousGeometry) previousGeometry.dispose();
 
     sideDecal.position.set(0, decalYCenter, decalZ);
@@ -262,10 +269,14 @@ export function createPolimaxxStack(sceneManager, state) {
     }
 
     const previousOverlayGeometry = overlay.geometry;
-    overlay.geometry = new THREE.PlaneGeometry(decalWidth, decalHeight);
+    overlay.geometry = createCurvedDecalGeometry(
+      decalWidth,
+      decalHeight,
+      decalYCenter,
+    );
     if (previousOverlayGeometry) previousOverlayGeometry.dispose();
 
-    overlay.position.set(0, decalYCenter, decalZ + 0.0015);
+    overlay.position.set(0, decalYCenter, decalZ + 0.0008);
 
     if (overlay.material?.map !== overlayTexture) {
       overlay.material.map = overlayTexture;

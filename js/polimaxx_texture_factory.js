@@ -49,7 +49,13 @@ export class PolimaxxTextureFactory {
   static mfgLogo = null;
   static mfgLogoListeners = new Set();
 
-  static mfgLogoUrl = new URL("../images/mfg.svg", import.meta.url).href;
+  // cache-bust: bump MFG_LOGO_VERSION ทุกครั้งที่แก้ images/mfg.svg
+  // เพื่อให้ browser โหลด SVG ใหม่ (ใหม่จาก cache เดิมของ Image())
+  static MFG_LOGO_VERSION = "2";
+  static mfgLogoUrl = new URL(
+    `../images/mfg.svg?v=${PolimaxxTextureFactory.MFG_LOGO_VERSION}`,
+    import.meta.url,
+  ).href;
 
   // แคช texture หน้า label ที่เป็น static (ไม่รวม QR2 + running number)
   // ใช้ร่วมกันทุกถุง จึงสร้างเพียงใบเดียว
@@ -399,6 +405,9 @@ export class PolimaxxTextureFactory {
     PolimaxxTextureFactory.drawFrontStatic(ctx, resolved);
 
     const texture = new THREE.CanvasTexture(canvas);
+    // ★ ต้องเป็น SRGB: canvas วาดด้วยสี sRGB ถ้าไม่ตั้ง texture จะถูกตีเป็น
+    // NoColorSpace -> แปลงสีผิด ทำให้ logo/text เข้มเพี้ยน/ดูเป็นสีเทา
+    texture.colorSpace = THREE.SRGBColorSpace;
     texture.anisotropy = getSafeAnisotropy();
     texture.generateMipmaps = false;
     texture.minFilter = THREE.LinearFilter;
@@ -449,6 +458,8 @@ export class PolimaxxTextureFactory {
     PolimaxxTextureFactory.drawFrontDynamic(ctx, resolved, bagNo);
 
     const texture = new THREE.CanvasTexture(canvas);
+    // ★ SRGB: canvas วาดด้วยสี sRGB (ไม่ตั้ง = NoColorSpace -> สีเพี้ยน/เทา)
+    texture.colorSpace = THREE.SRGBColorSpace;
     texture.anisotropy = getSafeAnisotropy();
     texture.generateMipmaps = false;
     texture.minFilter = THREE.LinearFilter;
@@ -478,6 +489,8 @@ export class PolimaxxTextureFactory {
     PolimaxxTextureFactory.drawFrontDynamic(ctx, resolved, bagNo);
 
     const texture = new THREE.CanvasTexture(canvas);
+    // ★ SRGB: canvas วาดด้วยสี sRGB (ไม่ตั้ง = NoColorSpace -> สีเพี้ยน/เทา)
+    texture.colorSpace = THREE.SRGBColorSpace;
     texture.anisotropy = getSafeAnisotropy();
     texture.generateMipmaps = false;
     texture.minFilter = THREE.LinearFilter;

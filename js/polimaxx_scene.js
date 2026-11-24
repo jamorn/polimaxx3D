@@ -166,6 +166,12 @@ export class PolimaxxSceneManager {
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
+    this.controls.dampingFactor = 0.12;
+    // ให้ซูมตอบสนองไวกว่าเดิม (desktop รู้สึกหนืดเมื่อใช้ค่า default = 1)
+    this.controls.zoomSpeed = 1.6;
+    this.controls.rotateSpeed = 1.0;
+    this.controls.minDistance = 0.6;
+    this.controls.maxDistance = 12;
     this.controls.zoomToCursor = !isTouchCentricViewport();
     this.controls.target.set(
       cameraPreset.target.x,
