@@ -103,22 +103,32 @@ export class PolimaxxTextureFactory {
     return PolimaxxTextureFactory.qrCache.get(key);
   }
 
-  static drawQrToContext(ctx, text, x, y, size) {
+  // อัตราส่วนชดเชยเพื่อให้ QR บน decal (plane ที่ไม่จัตุรัส) กลับมาเป็นจัตุรัสบน 3D
+  //   QR จะจัตุรัสบนจอ ⟺ plane aspect = texture aspect
+  //   texture = 4096x1024 (4:1), plane = decalWidth/decalHeight = bagWidth/bagHeight (ตั้ง 2.407:1)
+  //   → บน texture ต้องวาด QR ให้กว้างขึ้น = (texture aspect)/(plane aspect)
+  //   = 4 / (0.337/0.14) ≈ 1.662
+  // ถ้าเปลี่ยนสัดส่วนถุง (bagWidth/bagHeight) ต้องอัปเดตค่านี้ให้ตรง
+  static frontQrWidthScale = 1.662;
+
+  // widthScale = ตัวคูณความกว้างของ QR (ชดเชย aspect) — default 1 = จัตุรัส
+  static drawQrToContext(ctx, text, x, y, size, widthScale = 1) {
     if (!text) return false;
     const { size: n, data } = PolimaxxTextureFactory.getQrModules(text);
     if (!n || !data) return false;
 
-    const cell = size / n;
+    const cellW = (size * widthScale) / n;
+    const cellH = size / n;
 
     // ไม่วาดพื้นหลังสีขาว (โปร่งใส) — วาดเฉพาะ module สีดำ
     ctx.fillStyle = "#000";
     for (let row = 0; row < n; row += 1) {
       for (let col = 0; col < n; col += 1) {
         if (data[row * n + col]) {
-          const px = x + Math.floor(col * cell);
-          const py = y + Math.floor(row * cell);
-          const pw = Math.ceil(x + (col + 1) * cell) - px;
-          const ph = Math.ceil(y + (row + 1) * cell) - py;
+          const px = x + Math.floor(col * cellW);
+          const py = y + Math.floor(row * cellH);
+          const pw = Math.ceil(x + (col + 1) * cellW) - px;
+          const ph = Math.ceil(y + (row + 1) * cellH) - py;
           ctx.fillRect(px, py, pw, ph);
         }
       }
@@ -270,34 +280,49 @@ export class PolimaxxTextureFactory {
     currentX += 540;
 
     if (resolved.showQr) {
-      const qrX = currentX;
-      const qrY = midY - 85;
+      // ── QR1: วาดชดเชย aspect เพื่อให้จัตุรัสบน 3D (plane ไม่จัตุรัส) ──
+      // ขยาย "ไปทางขวา" (คง left edge) เพื่อไม่ให้ทับ symbol/grade ด้านซ้าย
+      const qrSize = 170;
+      const qrWidthScale = PolimaxxTextureFactory.frontQrWidthScale;
+      const qrDrawnWidth = qrSize * qrWidthScale;
+      const qrX = currentX; // left edge คงเดิม (ไม่ทับฝั่งซ้าย)
+      const qrY = midY - qrSize / 2;
       const drawn = PolimaxxTextureFactory.drawQrToContext(
         ctx,
         resolved.qrText,
         qrX,
         qrY,
-        170,
+        qrSize,
+        qrWidthScale,
       );
 
       if (!drawn) {
         ctx.fillStyle = "#000";
-        ctx.fillRect(qrX, qrY, 170, 170);
+        ctx.fillRect(qrX, qrY, qrDrawnWidth, qrSize);
         ctx.fillStyle = "#fff";
 
         for (let x = 0; x < 3; x += 1) {
           for (let y = 0; y < 3; y += 1) {
             if ((x + y) % 2 === 0) {
-              ctx.fillRect(qrX + 18 + x * 48, qrY + 18 + y * 48, 40, 40);
+              ctx.fillRect(
+                qrX + 18 + x * (qrDrawnWidth / 3.2),
+                qrY + 18 + y * 48,
+                40,
+                40,
+              );
             }
           }
         }
       }
 
       ctx.fillStyle = "#000";
+
+      // ดัน currentX ให้เลยขอบขวาของ QR ที่กว้างขึ้น + เว้นช่องไฟเดิม (110)
+      currentX = qrX + qrDrawnWidth + 110;
+    } else {
+      currentX += 280;
     }
 
-    currentX += 280;
     ctx.font = "bold 75px sans-serif";
     ctx.fillText(resolved.material, currentX, midY - 38);
     ctx.fillText(resolved.time, currentX, midY + 38);
@@ -318,8 +343,12 @@ export class PolimaxxTextureFactory {
     ctx.textBaseline = "middle";
 
     if (resolved.showQr2) {
+      // ── QR2: วาดชดเชย aspect เพื่อให้จัตุรัสบน 3D (plane ไม่จัตุรัส) ──
       const qr2Size = 170;
-      const qr2X = 220;
+      const qr2WidthScale = PolimaxxTextureFactory.frontQrWidthScale;
+      const qr2DrawnWidth = qr2Size * qr2WidthScale;
+      const qr2CenterX = 220 + qr2Size / 2;
+      const qr2X = qr2CenterX - qr2DrawnWidth / 2;
       const qr2Y = midY - qr2Size / 2;
 
       const [gradePart = "", lotPart = ""] = String(
@@ -334,6 +363,7 @@ export class PolimaxxTextureFactory {
         qr2X,
         qr2Y,
         qr2Size,
+        qr2WidthScale,
       );
 
       if (!drawn2) {
@@ -355,16 +385,19 @@ export class PolimaxxTextureFactory {
           [0, 1, 1, 0, 0, 1, 0, 1, 0, 1, 0, 0, 1],
           [1, 0, 1, 1, 0, 0, 1, 0, 1, 1, 1, 0, 1],
         ];
-        const qr2Pad = (qr2Size - module * gridN) / 2;
+        const cellW = (module * gridN * qr2WidthScale) / gridN; // = module * widthScale
+        const cellH = module;
+        const qr2PadW = (qr2DrawnWidth - cellW * gridN) / 2;
+        const qr2PadH = (qr2Size - cellH * gridN) / 2;
 
         for (let row = 0; row < gridN; row += 1) {
           for (let col = 0; col < gridN; col += 1) {
             if (pattern[row][col]) {
               ctx.fillRect(
-                qr2X + qr2Pad + col * module,
-                qr2Y + qr2Pad + row * module,
-                module,
-                module,
+                qr2X + qr2PadW + col * cellW,
+                qr2Y + qr2PadH + row * cellH,
+                cellW,
+                cellH,
               );
             }
           }
@@ -377,8 +410,13 @@ export class PolimaxxTextureFactory {
     const serialStartXLocal = serialStartX;
     ctx.font = "italic bold 85px sans-serif";
     const rohsWidth = ctx.measureText(resolved.rohs).width;
+    // ต้องตรงกับ layout ของ drawFrontStatic: QR1 กว้าง = 170*qrWidthScale,
+    // ระยะหลัง QR = +110 (แทน +280 เดิม) เพื่อให้ bagNo อยู่ตำแหน่งเดียวกับ static
+    const qr1Advance = resolved.showQr
+      ? 170 * PolimaxxTextureFactory.frontQrWidthScale + 110
+      : 280;
     const numberBaseX =
-      serialStartXLocal + 1380 + 540 + 280 + 460 + rohsWidth + 90;
+      serialStartXLocal + 1380 + 540 + qr1Advance + 460 + rohsWidth + 90;
 
     if (resolved.showBagNo) {
       ctx.textAlign = "left";

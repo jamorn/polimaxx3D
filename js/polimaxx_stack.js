@@ -211,9 +211,120 @@ export function createPolimaxxStack(sceneManager, state) {
     return bagMesh.userData.overlayTexture;
   }
 
-  function createCurvedDecalGeometry(width, height, yCenter, segments = 32) {
-    // plane แบนปกติ (กลับมาใช้แบบเดิมที่มองเห็นครบ)
-    return new THREE.PlaneGeometry(width, height, segments, 1);
+  // ── Curved decal geometry (raycast ตามผิวหน้าถุง) ──
+  // ถุงทุกใบใช้ dimension เดียวกัน (state.bagWidth/Length/Height เป็น global)
+  // จึงสร้าง geometry โค้งครั้งเดียว (raycast 1 ครั้ง) แล้วแชร์ให้ทุก mesh
+  // — ไม่ต้องสร้างใหม่ทุกครั้งที่ syncBagSideDecal (เดิมสร้าง PlaneGeometry ทุก sync)
+  const _decalCache = {
+    key: null,
+    static: null, // geometry สำหรับ static decal (ทุกถุงใช้ร่วม)
+    overlay: null, // geometry สำหรับ overlay (QR/running — ขนาดเดียวกับ static)
+  };
+
+  const _raycaster = new THREE.Raycaster();
+  const _rayOrigin = new THREE.Vector3();
+  const _rayDir = new THREE.Vector3(0, 0, -1);
+
+  function createCurvedDecalGeometry(
+    decalWidth,
+    decalHeight,
+    yCenter,
+    frontBulge,
+    segments,
+    sourceBagMesh,
+  ) {
+    const segY = Math.max(2, Math.round(segments / 2));
+    const geo = new THREE.PlaneGeometry(
+      decalWidth,
+      decalHeight,
+      segments,
+      segY,
+    );
+    const pos = geo.attributes.position;
+
+    // ใช้ตำแหน่ง/rotation ของถุงต้นแบบ (rot=0) ในการ raycast ผิวหน้า (+Z)
+    // ถุงจริงทุกใบใช้ geometry เดียวกันนี้ติดตั้งบน mesh ของตัวเอง (position/rotation ต่างกัน)
+    sourceBagMesh.updateMatrixWorld(true);
+    const invMat = new THREE.Matrix4().copy(sourceBagMesh.matrixWorld).invert();
+    const zTop = state.bagLength / 2 + frontBulge + 0.2;
+    const localPoint = new THREE.Vector3();
+
+    for (let i = 0; i < pos.count; i += 1) {
+      const px = pos.getX(i);
+      const pyLocal = pos.getY(i);
+      const worldY = yCenter + pyLocal;
+
+      _rayOrigin.set(px, worldY, zTop);
+      const originWorld = _rayOrigin
+        .clone()
+        .applyMatrix4(sourceBagMesh.matrixWorld);
+      const dirWorld = _rayDir
+        .clone()
+        .transformDirection(sourceBagMesh.matrixWorld);
+
+      _raycaster.set(originWorld, dirWorld);
+      const hits = _raycaster.intersectObject(sourceBagMesh, false);
+
+      let zSurface;
+      if (hits.length > 0) {
+        localPoint.copy(hits[0].point).applyMatrix4(invMat);
+        zSurface = localPoint.z;
+      } else {
+        // นอกขอบถุง (มุม decal ยื่นพ้น) → สูตร fallback
+        const nx = px / (state.bagWidth / 2);
+        const ny = worldY / (state.bagHeight / 2);
+        zSurface =
+          state.bagLength / 2 +
+          frontBulge * (1 - nx * nx * 0.3) * (1 - ny * ny * 0.3);
+      }
+
+      // mesh.position.z = bagLength/2 + offset → เก็บ (zSurface - bagLength/2)
+      pos.setZ(i, zSurface - state.bagLength / 2);
+    }
+
+    pos.needsUpdate = true;
+    geo.computeVertexNormals();
+    return geo;
+  }
+
+  // สร้าง/รีเฟรช geometry โค้งใน cache (เรียกครั้งเดียวต่อการเปลี่ยน dimension)
+  function rebuildDecalGeometryCache(sourceBagMesh) {
+    // ★ PRESENTATION SIZE (ใหญ่เต็มผิว) — ใช้สำหรับโชว์โมเดล/นำเสนอให้เห็นรายละเอียดชัด
+    // ⚠️ PRODUCTION ห้ามใช้ค่าขนาดนี้: decal เกือบเต็มผิว = ปริมาณการพิมพ์ inkjet
+    //    (พื้นที่พิมพ์จริงบนถุง) เพิ่มขึ้นมหาศาล → ต้นทุนการพิมพ์ต่อถุงพุ่งสูงตาม
+    //    ค่าที่ผลิตจริงควรเล็กกว่าเดิม (เช่น 0.84 กว้าง / 0.36 สูง) ตามสเปกจริง
+    const decalWidth = state.bagWidth * 0.95;
+    const decalHeight = state.bagHeight * 0.95;
+    const decalYCenter = 0; // centered (เต็มผิว → ต้องไม่เยื้อง) — ต้องตรงกับ syncBagSideDecal
+    const frontBulge = getScaledFrontBulgeZ();
+    const segments = 32;
+
+    if (!sourceBagMesh) return;
+
+    // dispose ของเก่า (ถ้ามี) ก่อนสร้างใหม่ — ระวัง static/overlay แชร์ geometry
+    // เดียวกัน จึง dispose เพียงครั้งเดียว
+    const oldGeo = _decalCache.static;
+    _decalCache.static = null;
+    _decalCache.overlay = null;
+    if (oldGeo) oldGeo.dispose();
+
+    // static + overlay ใช้ shape เดียวกัน (ขนาดเท่ากัน) แชร์ geometry เดียวได้เลย
+    const geo = createCurvedDecalGeometry(
+      decalWidth,
+      decalHeight,
+      decalYCenter,
+      frontBulge,
+      segments,
+      sourceBagMesh,
+    );
+    _decalCache.static = geo;
+    _decalCache.overlay = geo; // ใช้ร่วมกัน (mesh แยกกัน แต่ geometry เดียว)
+
+    _decalCache.key = [
+      state.bagWidth.toFixed(5),
+      state.bagLength.toFixed(5),
+      state.bagHeight.toFixed(5),
+    ].join("|");
   }
 
   function syncBagSideDecal(bagMesh) {
@@ -223,31 +334,35 @@ export function createPolimaxxStack(sceneManager, state) {
       PolimaxxTextureFactory.getStaticFrontTexture(DEFAULT_SIDE_LABEL);
     const overlayTexture = ensureBagOverlayTexture(bagMesh);
 
-    const decalWidth = state.bagWidth * 0.84;
-    const decalHeight = state.bagHeight * 0.36;
-    const decalYCenter = state.bagHeight * 0.05;
-    // plane แบนวางที่ผิวด้านหน้า (ปูดสุดที่กลาง) + offset กัน z-fighting
-    const decalZ = state.bagLength / 2 + getScaledFrontBulgeZ() + 0.0008;
+    const decalYCenter = 0; // centered — ต้องตรงกับ rebuildDecalGeometryCache
+    // curved geometry พา frontConvex/shrink มาใน vertex z แล้ว → base z = L/2 + offset
+    const decalZ = state.bagLength / 2 + 0.0008;
 
+    // ถ้า cache ยังว่าง หรือขนาดเปลี่ยน (เช่นถูกเรียกก่อน applyBagDimensions)
+    // → สร้าง geometry ให้ตรงขนาดปัจจุบัน (safety net)
+    const expectedKey = [
+      state.bagWidth.toFixed(5),
+      state.bagLength.toFixed(5),
+      state.bagHeight.toFixed(5),
+    ].join("|");
+    if (!_decalCache.static || _decalCache.key !== expectedKey) {
+      rebuildDecalGeometryCache(bagMesh);
+    }
+
+    // static decal — ใช้ geometry ที่แชร์ (ห้าม dispose ตอน sync)
     let sideDecal = bagMesh.userData[SIDE_DECAL_KEY];
     if (!sideDecal) {
       sideDecal = new THREE.Mesh(
-        new THREE.PlaneGeometry(1, 1),
+        _decalCache.static,
         createBagSideDecalMaterial(staticTexture),
       );
       sideDecal.renderOrder = 10;
       sideDecal.userData.isSideDecal = true;
       bagMesh.add(sideDecal);
       bagMesh.userData[SIDE_DECAL_KEY] = sideDecal;
+    } else {
+      sideDecal.geometry = _decalCache.static;
     }
-
-    const previousGeometry = sideDecal.geometry;
-    sideDecal.geometry = createCurvedDecalGeometry(
-      decalWidth,
-      decalHeight,
-      decalYCenter,
-    );
-    if (previousGeometry) previousGeometry.dispose();
 
     sideDecal.position.set(0, decalYCenter, decalZ);
 
@@ -256,25 +371,20 @@ export function createPolimaxxStack(sceneManager, state) {
     }
     sideDecal.material.needsUpdate = true;
 
+    // overlay (QR2 + running no) — geometry แชร์เดียวกับ static
     let overlay = bagMesh.userData[SIDE_DECAL_OVERLAY_KEY];
     if (!overlay) {
       overlay = new THREE.Mesh(
-        new THREE.PlaneGeometry(1, 1),
+        _decalCache.overlay,
         createBagSideDecalMaterial(overlayTexture),
       );
       overlay.renderOrder = 11;
       overlay.userData.isSideDecal = true;
       bagMesh.add(overlay);
       bagMesh.userData[SIDE_DECAL_OVERLAY_KEY] = overlay;
+    } else {
+      overlay.geometry = _decalCache.overlay;
     }
-
-    const previousOverlayGeometry = overlay.geometry;
-    overlay.geometry = createCurvedDecalGeometry(
-      decalWidth,
-      decalHeight,
-      decalYCenter,
-    );
-    if (previousOverlayGeometry) previousOverlayGeometry.dispose();
 
     overlay.position.set(0, decalYCenter, decalZ + 0.0008);
 
@@ -1286,6 +1396,17 @@ export function createPolimaxxStack(sceneManager, state) {
 
     syncBaseRowAnchors();
     refreshWallGeometries();
+
+    // อัปเดต geometry ของ "ถุงต้นแบบ" ก่อน เพื่อให้ raycast จับผิวขนาดใหม่ถูกต้อง
+    const sourceBag = bags[0];
+    if (sourceBag) {
+      sourceBag.geometry = nextGeometry;
+    }
+
+    // สร้าง geometry โค้งใหม่ "ครั้งเดียว" ต่อ dimension แล้วแชร์ให้ทุกถุง
+    // (raycast กับ sourceBag ที่มี geometry ขนาดใหม่แล้ว; matrixWorld จัดการ rotation)
+    rebuildDecalGeometryCache(sourceBag);
+
     getAllBags().forEach((bagMesh) => {
       bagMesh.geometry = nextGeometry;
       bagMesh.position.y = getLayerCenterY(bagMesh.userData.layer || 1);
