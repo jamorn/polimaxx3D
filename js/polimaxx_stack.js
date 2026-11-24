@@ -11,6 +11,7 @@ import {
   MANUAL_PRESET_BAG,
   ROW_WALL_GAP,
   SHAPE_REFERENCE,
+  STACK_LIFT_LAYERS,
   TOTAL_LAYERS,
 } from "./polimaxx_config.js";
 import { PolimaxxBag } from "./polimaxx_bag.js";
@@ -301,7 +302,11 @@ export function createPolimaxxStack(sceneManager, state) {
   }
 
   function getLayerCenterY(layerIndex) {
-    return getBagCenterY() + (layerIndex - 1) * state.bagHeight;
+    return (
+      getBagCenterY() +
+      (layerIndex - 1) * state.bagHeight +
+      (state.stackLift || 0)
+    );
   }
 
   function getLayer2FrontGroupBaseZ() {
@@ -1328,6 +1333,81 @@ export function createPolimaxxStack(sceneManager, state) {
     updateLayerVisibility();
   }
 
+  // ── Stack lift: ยกกองถุงทั้งหมดขึ้น/ลงเป็นก้อนเดียว ──
+  function getMaxStackLift() {
+    return STACK_LIFT_LAYERS * state.bagHeight;
+  }
+
+  function setStackLift(value) {
+    state.stackLift = value;
+    getAllBags().forEach((bagMesh) => {
+      bagMesh.position.y = getLayerCenterY(bagMesh.userData.layer || 1);
+    });
+    updateLabelPositions();
+  }
+
+  let stackLiftAnimating = false;
+  let stackLiftAnimHandle = null;
+
+  function isStackLifting() {
+    return stackLiftAnimating;
+  }
+
+  function animateStackLift(targetLift, onDone) {
+    if (stackLiftAnimating) return;
+    const clampedTarget = THREE.MathUtils.clamp(
+      targetLift,
+      0,
+      getMaxStackLift(),
+    );
+    const startLift = state.stackLift || 0;
+    const delta = clampedTarget - startLift;
+
+    if (Math.abs(delta) < 1e-6) {
+      setStackLift(clampedTarget);
+      onDone?.();
+      return;
+    }
+
+    stackLiftAnimating = true;
+    const duration = 600;
+    const t0 = performance.now();
+
+    const step = (now) => {
+      const t = Math.min(1, (now - t0) / duration);
+      // easeInOutCubic
+      const e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      setStackLift(startLift + delta * e);
+
+      if (t < 1) {
+        stackLiftAnimHandle = requestAnimationFrame(step);
+      } else {
+        stackLiftAnimating = false;
+        stackLiftAnimHandle = null;
+        setStackLift(clampedTarget);
+        onDone?.();
+      }
+    };
+
+    stackLiftAnimHandle = requestAnimationFrame(step);
+  }
+
+  function liftStackUp(onDone) {
+    animateStackLift(getMaxStackLift(), onDone);
+  }
+
+  function liftStackDown(onDone) {
+    animateStackLift(0, onDone);
+  }
+
+  function isStackLifted() {
+    return (state.stackLift || 0) > getMaxStackLift() - 1e-4;
+  }
+
+  function isStackLiftedDown() {
+    return (state.stackLift || 0) < 1e-4;
+  }
+
   function setLabelsVisible(visible) {
     state.showLabels = visible;
     updateLabelPositions();
@@ -1445,6 +1525,13 @@ export function createPolimaxxStack(sceneManager, state) {
     getTotalLayers: () => TOTAL_LAYERS,
     updateLayerVisibility,
     setVisibleLayerCount,
+    getMaxStackLift,
+    animateStackLift,
+    liftStackUp,
+    liftStackDown,
+    isStackLifting,
+    isStackLifted,
+    isStackLiftedDown,
     setLabelsVisible,
     setGridVisible,
     setPalletVisible,

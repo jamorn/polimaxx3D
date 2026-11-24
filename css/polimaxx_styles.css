@@ -63,6 +63,47 @@ button.active:hover {
     background: #ff8c42;
 }
 
+/* ── ปุ่มยก/ลดกองถุง (Arrow UP/DOWN) ด้านข้างจอ ── */
+.stack-lift {
+    position: fixed;
+    top: 50%;
+    right: 16px;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 400;
+}
+
+.lift-btn {
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 50%;
+    background: #ffffff;
+    color: #f37021;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+    cursor: pointer;
+    transition: all 0.18s ease;
+}
+
+.lift-btn:hover {
+    background: #f37021;
+    color: #ffffff;
+}
+
+.lift-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    background: #e9ecef;
+    color: #9aa0a6;
+    box-shadow: none;
+}
+
 .lil-gui.root {
     position: fixed;
     top: 20px;
@@ -144,9 +185,23 @@ button.active:hover {
         max-width: 320px;
     }
 
-    .lil-gui.root > .children {
+        .lil-gui.root > .children {
         max-height: calc(100vh - 104px);
         max-height: calc(100dvh - 104px);
+    }
+
+    /* lil-gui อยู่ขวา -> ย้ายปุ่มยก/ลดไปซ้าย กันทับ */
+    .stack-lift {
+        right: auto;
+        left: 10px;
+        top: auto;
+        bottom: 90px;
+        transform: none;
+    }
+
+    .lift-btn {
+        width: 44px;
+        height: 44px;
     }
 }
 

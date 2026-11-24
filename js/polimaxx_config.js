@@ -45,6 +45,9 @@ export const DEFAULT_Z_OFFSETS_MM = Object.freeze({
 
 export const TOTAL_LAYERS = 8;
 
+// ความสูงที่ยกกองถุงขึ้น (เป็นจำนวนเท่าของ bagHeight) เพื่อให้เห็น pallet ใต้
+export const STACK_LIFT_LAYERS = 3;
+
 export const DEFAULT_SIDE_LABEL = Object.freeze({
   serial: "1126NK 0260204008",
   standard: "TIS.1306-2566",
@@ -87,5 +90,6 @@ export function createInitialState() {
     wallColor: "#fc182f",
     palletOpacity: 1,
     palletColor: "#021ef2",
+    stackLift: 0,
   };
 }
