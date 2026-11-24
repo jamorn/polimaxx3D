@@ -1,235 +1,248 @@
 body {
-    margin: 0;
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-    background: #2a2a3a;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    /* กัน bounce scroll บน iOS ที่ทำให้ viewport กระพริบ */
-    overscroll-behavior: none;
-    -webkit-text-size-adjust: 100%;
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #2a2a3a;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  /* กัน bounce scroll บน iOS ที่ทำให้ viewport กระพริบ */
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
 }
 
 /* canvas ของ WebGL และ label layer ให้ซ้อนเต็มจอ คงที่ ไม่กระตุกตอน scroll */
 body > canvas,
 .label-layer {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    display: block;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 .label-layer {
-    pointer-events: none;
-    z-index: 250;
+  pointer-events: none;
+  z-index: 250;
 }
 
 .controls {
-    position: absolute;
-    top: 20px;
-    left: 20px;
-    transform: none;
-    display: flex;
-    gap: 10px;
-    background: white;
-    padding: 10px;
-    border-radius: 30px;
-    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
-    z-index: 300;
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  transform: none;
+  display: flex;
+  gap: 10px;
+  background: white;
+  padding: 10px;
+  border-radius: 30px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+  z-index: 300;
 }
 
 button {
-    padding: 8px 20px;
-    border: none;
-    border-radius: 20px;
-    background: #e9ecef;
-    cursor: pointer;
-    font-weight: 600;
-    transition: all 0.2s;
+  padding: 8px 20px;
+  border: none;
+  border-radius: 20px;
+  background: #e9ecef;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
 }
 
 button.active {
-    background: #f37021;
-    color: white;
+  background: #f37021;
+  color: white;
 }
 
 button:hover {
-    background: #d0d4d9;
+  background: #d0d4d9;
 }
 
 button.active:hover {
-    background: #ff8c42;
+  background: #ff8c42;
 }
 
-/* ── ปุ่มยก/ลดกองถุง (Arrow UP/DOWN) ด้านข้างจอ ── */
+/* ── ปุ่มยก/ลดกองถุง (Arrow UP/DOWN) ──
+   [desktop] อยู่ขวากลางจอ (แนวตั้ง ▲ บน ▼ ล่าง)
+   [mobile]  ย้ายไปซ้ายล่างใน media query ด้านล่าง (กันทับ lil-gui ที่อยู่ขวา) */
 .stack-lift {
-    position: fixed;
-    top: 50%;
-    right: 16px;
-    transform: translateY(-50%);
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    z-index: 400;
+  position: fixed;
+  top: 50%;
+  right: 16px;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 400;
 }
 
 .lift-btn {
-    width: 48px;
-    height: 48px;
-    padding: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: none;
-    border-radius: 50%;
-    background: #ffffff;
-    color: #f37021;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
-    cursor: pointer;
-    transition: all 0.18s ease;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #f37021;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+  cursor: pointer;
+  transition: all 0.18s ease;
 }
 
 .lift-btn:hover {
-    background: #f37021;
-    color: #ffffff;
+  background: #f37021;
+  color: #ffffff;
 }
 
 .lift-btn:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-    background: #e9ecef;
-    color: #9aa0a6;
-    box-shadow: none;
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: #e9ecef;
+  color: #9aa0a6;
+  box-shadow: none;
 }
 
+/* ── lil-gui panel (ปรับแต่งโครงสร้าง) ──
+   [desktop default] มุมขวาบน (top-right)
+   [mobile/non-desktop] ย้ายไปมุมขวาล่าง (bottom-right) ใน media query ด้านล่าง
+   -- หมายเหตุ: lil-gui ไม่ได้ "รู้" ว่าเป็น desktop หรือ mobile เอง --
+   ตำแหน่งถูกกำหนดโดย CSS @media ที่ browser ตัดสินใจ (matchMedia) ให้ */
 .lil-gui.root {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 1000;
-    border-radius: 10px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-    overflow: hidden;
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+  border-radius: 10px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
 }
 
 .lil-gui.root > .children {
-    max-height: calc(100vh - 92px);
-    overflow-y: auto;
-    padding: 6px 0;
+  max-height: calc(100vh - 92px);
+  overflow-y: auto;
+  padding: 6px 0;
 }
 
 .lil-gui.root > .children > .lil-gui {
-    position: static;
-    margin-top: 6px;
+  position: static;
+  margin-top: 6px;
 }
 
 .lil-gui.root > .children > .lil-gui:first-child {
-    margin-top: 0;
+  margin-top: 0;
 }
 
 .lil-gui.root > .children::-webkit-scrollbar {
-    width: 5px;
+  width: 5px;
 }
 
 .lil-gui.root > .children::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.1);
-    border-radius: 0 8px 8px 0;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 0 8px 8px 0;
 }
 
 .lil-gui.root > .children::-webkit-scrollbar-thumb {
-    background: #f37021;
-    border-radius: 5px;
+  background: #f37021;
+  border-radius: 5px;
 }
 
 .bag-label {
-    transform: translate(-50%, -100%);
-    min-width: 32px;
-    padding: 6px 10px;
-    border-radius: 999px;
-    border: 1px solid rgba(243, 112, 33, 0.88);
-    background: rgba(12, 21, 36, 0.88);
-    color: #ffffff;
-    text-align: center;
-    font-size: 15px;
-    font-weight: 700;
-    line-height: 1;
-    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.28);
-    white-space: nowrap;
+  transform: translate(-50%, -100%);
+  min-width: 32px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(243, 112, 33, 0.88);
+  background: rgba(12, 21, 36, 0.88);
+  color: #ffffff;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.28);
+  white-space: nowrap;
 }
 
-/* จอเล็ก / non-desktop: ขยับ lil-gui ลงให้พ้นแถวปุ่มด้านบน ไม่ให้ทับกัน */
+/* ── จอเล็ก / non-desktop: lil-gui ย้ายไปมุมขวาล่าง (bottom-right) ไม่บัง product ──
+   เงื่อนไข (ข้อใดข้อหนึ่ง): จอกว้าง ≤ 768px หรือ อุปกรณ์ touch (ไม่มี hover + pointer หยาบ)
+   browser จะ match media query นี้เอง lil-gui/lift ไม่มี logic ตรวจเอง */
 @media (max-width: 768px), (hover: none) and (pointer: coarse) {
-    .controls {
-        top: 10px;
-        left: 10px;
-        right: 10px;
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 6px;
-        padding: 8px;
-    }
+  .controls {
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px;
+  }
 
-    .controls button {
-        padding: 6px 12px;
-        font-size: 13px;
-    }
+  .controls button {
+    padding: 6px 12px;
+    font-size: 13px;
+  }
 
-            .lil-gui.root {
-        top: 84px;
-        right: 10px;
-        left: auto;
-        --width: 320px;
-        width: calc(100vw - 20px) !important;
-        max-width: 320px;
-    }
+  /* lil-gui: top -> auto + bottom:10px = มุมขวาล่าง */
+  .lil-gui.root {
+    top: auto;
+    bottom: 10px;
+    right: 10px;
+    left: auto;
+    --width: 320px;
+    width: calc(100vw - 20px) !important;
+    max-width: 320px;
+  }
 
-        .lil-gui.root > .children {
-        max-height: calc(100vh - 104px);
-        max-height: calc(100dvh - 104px);
-    }
+  /* ใช้ 100dvh (fallback 100vh) กัน panel ล้นบน iOS address bar */
+  .lil-gui.root > .children {
+    max-height: calc(100vh - 104px);
+    max-height: calc(100dvh - 20px);
+  }
 
-    /* lil-gui อยู่ขวา -> ย้ายปุ่มยก/ลดไปซ้าย กันทับ */
-    .stack-lift {
-        right: auto;
-        left: 10px;
-        top: auto;
-        bottom: 90px;
-        transform: none;
-    }
+  /* lil-gui อยู่ขวา -> ย้ายปุ่มยก/ลดไปซ้ายล่าง กันทับกัน */
+  .stack-lift {
+    right: auto;
+    left: 10px;
+    top: auto;
+    bottom: 90px;
+    transform: none;
+  }
 
-    .lift-btn {
-        width: 44px;
-        height: 44px;
-    }
+  .lift-btn {
+    width: 44px;
+    height: 44px;
+  }
 }
 
-/* มือถือแนวนอน (จอเตี้ย): ลดระยะ top ลงให้ lil-gui มีที่มากขึ้น */
+/* ── มือถือแนวนอน (จอเตี้ย กว้างแต่สูง ≤ 500px): lil-gui มุมขวาล่างชิดขอบขึ้น ── */
 @media (max-height: 500px) and (hover: none) and (pointer: coarse) {
-    .controls {
-        top: 6px;
-        left: 6px;
-        right: 6px;
-        padding: 6px;
-        gap: 4px;
-    }
+  .controls {
+    top: 6px;
+    left: 6px;
+    right: 6px;
+    padding: 6px;
+    gap: 4px;
+  }
 
-    .controls button {
-        padding: 4px 10px;
-        font-size: 12px;
-    }
+  .controls button {
+    padding: 4px 10px;
+    font-size: 12px;
+  }
 
-            .lil-gui.root {
-        top: 56px;
-        right: 6px;
-        left: auto;
-        width: calc(100vw - 12px) !important;
-    }
+  /* lil-gui: top -> auto + bottom:6px = มุมขวาล่าง (ชิดขอบ) */
+  .lil-gui.root {
+    top: auto;
+    bottom: 6px;
+    right: 6px;
+    left: auto;
+    width: calc(100vw - 12px) !important;
+  }
 
-    .lil-gui.root > .children {
-        max-height: calc(100vh - 66px);
-        max-height: calc(100dvh - 66px);
-    }
+  .lil-gui.root > .children {
+    max-height: calc(100vh - 66px);
+    max-height: calc(100dvh - 12px);
+  }
 }
-
